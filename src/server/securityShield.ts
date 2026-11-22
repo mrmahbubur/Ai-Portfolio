@@ -1,12 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
+import { adminAuth } from '../lib/firebase-admin.ts';
 
-// Master administrative secret key (can be overridden via environment variables)
-const ADMIN_SECRET_KEY = (
-  process.env.ADMIN_SECRET ||
-  process.env.ADMIN_KEY ||
-  process.env.GMAIL_APP_PASSWORD ||
-  'MRS_SECURE_ADMIN_MASTER_KEY_2026'
-).trim();
+const ADMIN_OWNER_EMAIL = 'mr216873@gmail.com';
 
 // In-Memory IP Sliding Window Rate Limiter
 interface RateBucket {
@@ -195,16 +190,14 @@ export function adaptiveRateLimiter(req: Request, res: Response, next: NextFunct
 
 /**
  * 4. Administrative Authorization Guard
- * Protects confidential backend logs, verified face records, and automated review triggers from public view.
+ * Accepts configured environment secrets or a verified Firebase Admin ID token belonging to the owner email.
  */
-export function requireAdminAuthorization(req: Request, res: Response, next: NextFunction) {
+export async function requireAdminAuthorization(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const adminKeyHeader =
     req.headers['x-admin-key'] ||
     req.headers['x-admin-secret'] ||
-    req.headers['x-api-key'] ||
-    req.query.admin_key ||
-    req.query.admin_secret;
+    req.headers['x-api-key'];
 
   let providedToken = '';
   if (typeof adminKeyHeader === 'string') {
@@ -214,14 +207,29 @@ export function requireAdminAuthorization(req: Request, res: Response, next: Nex
   }
 
   const allowedKeys = [
-    'MRS_SECURE_ADMIN_MASTER_KEY_2026',
     process.env.ADMIN_SECRET,
     process.env.ADMIN_KEY,
     process.env.GMAIL_APP_PASSWORD,
-  ].filter(Boolean);
+  ]
+    .map((k) => (k || '').trim())
+    .filter(Boolean);
 
   if (providedToken && allowedKeys.includes(providedToken)) {
     return next();
+  }
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const idToken = authHeader.substring(7).trim();
+    if (idToken) {
+      try {
+        const decoded = await adminAuth.verifyIdToken(idToken);
+        if (decoded.email === ADMIN_OWNER_EMAIL && decoded.email_verified === true) {
+          return next();
+        }
+      } catch {
+        // Fall through to 403
+      }
+    }
   }
 
   return res.status(403).json({

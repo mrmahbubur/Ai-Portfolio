@@ -173,26 +173,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const strength = getPasswordStrength(password);
 
-  // Sync user profile to Firestore (creates or updates)
+  // Sync user profile to Firestore (creates or updates without mutating createdAt)
   const syncUserToFirestore = async (user: User, name?: string) => {
     const userPath = `users/${user.uid}`;
+    const userRef = doc(db, 'users', user.uid);
+    const cleanName = (name || user.displayName || 'Subscriber').trim().slice(0, 100);
+    const cleanEmail = (user.email || '').trim().slice(0, 128);
+    const nowIso = new Date().toISOString();
+
     try {
-      await setDoc(
-        doc(db, 'users', user.uid),
-        {
+      const existingSnap = await getDoc(userRef);
+      if (!existingSnap.exists()) {
+        await setDoc(userRef, {
           uid: user.uid,
-          email: user.email || '',
-          displayName: name || user.displayName || 'Subscriber',
+          email: cleanEmail,
+          displayName: cleanName,
           receivePlatformUpdates,
           receiveBlogUpdates,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        });
+      } else {
+        await updateDoc(userRef, {
+          displayName: cleanName,
+          receivePlatformUpdates,
+          receiveBlogUpdates,
+          updatedAt: nowIso,
+        });
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, userPath);
+      handleFirestoreError(err, existingErrorOp(err), userPath);
     }
+  };
+
+  const existingErrorOp = (err: unknown): OperationType => {
+    const msg = err instanceof Error ? err.message.toLowerCase() : '';
+    if (msg.includes('get')) return OperationType.GET;
+    return OperationType.WRITE;
   };
 
   // Register or update subscriber record in server memory & Firestore
@@ -210,23 +227,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           receiveBlogUpdates,
         }),
       });
+    } catch (err) {
+      console.warn('Non-fatal subscriber registration notice:', err);
+    }
 
-      if (uid) {
-        await setDoc(
-          doc(db, 'subscribers', uid),
-          {
-            email: userEmail,
-            name: name || undefined,
+    if (uid && auth.currentUser && auth.currentUser.uid === uid) {
+      const subPath = `subscribers/${uid}`;
+      const subRef = doc(db, 'subscribers', uid);
+      const safeName = name ? name.trim().slice(0, 100) : '';
+      const safeEmail = userEmail.trim().slice(0, 128);
+
+      try {
+        const subSnap = await getDoc(subRef);
+        if (!subSnap.exists()) {
+          const createPayload: Record<string, any> = {
+            email: safeEmail,
             uid,
             subscribedAt: new Date().toISOString(),
             receivePlatformUpdates,
             receiveBlogUpdates,
-          },
-          { merge: true }
-        );
+          };
+          if (safeName) {
+            createPayload.name = safeName;
+          }
+          await setDoc(subRef, createPayload);
+        } else {
+          const updatePayload: Record<string, any> = {
+            receivePlatformUpdates,
+            receiveBlogUpdates,
+          };
+          if (safeName) {
+            updatePayload.name = safeName;
+          }
+          await updateDoc(subRef, updatePayload);
+        }
+      } catch (err) {
+        console.warn('Firestore subscriber sync notice:', err);
+        if (err instanceof Error && err.message.toLowerCase().includes('permission')) {
+          handleFirestoreError(err, OperationType.WRITE, subPath);
+        }
       }
-    } catch (err) {
-      console.warn('Non-fatal subscriber registration notice:', err);
     }
   };
 
@@ -602,16 +642,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
       } catch (fbErr) {}
 
-      // 3. Update Firestore user profile matching rules keys
-      try {
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-          displayName: cleanName,
-          updatedAt: new Date().toISOString(),
-        });
-        await updateDoc(doc(db, 'subscribers', currentUser.uid), {
-          name: cleanName,
-        });
-      } catch {}
+      // 3. Update Firestore user & subscriber profiles when signed into Firebase
+      if (auth.currentUser && auth.currentUser.uid === currentUser.uid) {
+        const safeName = cleanName.slice(0, 100);
+        const nowIso = new Date().toISOString();
+        const userRef = doc(db, 'users', currentUser.uid);
+        const subRef = doc(db, 'subscribers', currentUser.uid);
+
+        try {
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            await updateDoc(userRef, {
+              displayName: safeName,
+              updatedAt: nowIso,
+            });
+          } else {
+            await setDoc(userRef, {
+              uid: currentUser.uid,
+              email: (auth.currentUser.email || currentUser.email || '').slice(0, 128),
+              displayName: safeName,
+              receivePlatformUpdates,
+              receiveBlogUpdates,
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            });
+          }
+
+          const subSnap = await getDoc(subRef);
+          if (subSnap.exists()) {
+            await updateDoc(subRef, { name: safeName });
+          }
+        } catch (fsErr) {
+          if (fsErr instanceof Error && fsErr.message.toLowerCase().includes('permission')) {
+            handleFirestoreError(fsErr, OperationType.UPDATE, `users/${currentUser.uid}`);
+          }
+        }
+      }
 
       // 4. Update local storage session
       const updatedUser = {
@@ -650,19 +716,57 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }),
       });
 
-      // 2. Update Firestore users document matching rules keys
-      try {
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-          receivePlatformUpdates,
-          receiveBlogUpdates,
-          updatedAt: new Date().toISOString(),
-        });
-        await updateDoc(doc(db, 'subscribers', currentUser.uid), {
-          receivePlatformUpdates,
-          receiveBlogUpdates,
-        });
-      } catch (subErr) {
-        console.warn('Firestore subscriber preference sync note:', subErr);
+      // 2. Update Firestore users & subscribers documents when signed into Firebase
+      if (auth.currentUser && auth.currentUser.uid === currentUser.uid) {
+        const nowIso = new Date().toISOString();
+        const userRef = doc(db, 'users', currentUser.uid);
+        const subRef = doc(db, 'subscribers', currentUser.uid);
+
+        try {
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            await updateDoc(userRef, {
+              receivePlatformUpdates,
+              receiveBlogUpdates,
+              updatedAt: nowIso,
+            });
+          } else {
+            await setDoc(userRef, {
+              uid: currentUser.uid,
+              email: (auth.currentUser.email || currentUser.email || '').slice(0, 128),
+              displayName: (currentUser.displayName || 'Subscriber').slice(0, 100),
+              receivePlatformUpdates,
+              receiveBlogUpdates,
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            });
+          }
+
+          const subSnap = await getDoc(subRef);
+          if (subSnap.exists()) {
+            await updateDoc(subRef, {
+              receivePlatformUpdates,
+              receiveBlogUpdates,
+            });
+          } else if (auth.currentUser.email) {
+            const subPayload: Record<string, any> = {
+              email: auth.currentUser.email.slice(0, 128),
+              uid: currentUser.uid,
+              subscribedAt: nowIso,
+              receivePlatformUpdates,
+              receiveBlogUpdates,
+            };
+            if (currentUser.displayName) {
+              subPayload.name = String(currentUser.displayName).trim().slice(0, 100);
+            }
+            await setDoc(subRef, subPayload);
+          }
+        } catch (subErr) {
+          console.warn('Firestore subscriber preference sync note:', subErr);
+          if (subErr instanceof Error && subErr.message.toLowerCase().includes('permission')) {
+            handleFirestoreError(subErr, OperationType.UPDATE, `users/${currentUser.uid}`);
+          }
+        }
       }
 
       // 3. Update local session in storage

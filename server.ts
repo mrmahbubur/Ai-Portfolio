@@ -9,6 +9,7 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold, ThinkingLevel, Modality, type Content, type Part, type LiveServerMessage } from "@google/genai";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
+import { adminAuth } from "./src/lib/firebase-admin.ts";
 import { getOrCreateUser, getUserByUid } from "./src/db/users.ts";
 import { saveInquiry } from "./src/db/inquiries.ts";
 import { generateIntelligentAnswer } from "./src/utils/intelligentQA.ts";
@@ -3196,6 +3197,18 @@ app.post("/api/inquiries", async (req, res) => {
     const destinationEmail = process.env.GMAIL_RECIPIENT || process.env.GMAIL_USER || "mr216873@gmail.com";
     const gmailUser = process.env.GMAIL_USER || "mr216873@gmail.com";
 
+    const escapeHtml = (unsafe: string) =>
+      unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const safeHtmlName = escapeHtml(senderName);
+    const safeHtmlEmail = escapeHtml(senderEmail);
+    const safeHtmlNote = escapeHtml(senderNote);
+
     const transporter = getSmtpTransporter();
     let smtpDelivered = false;
     let smtpMessageId = "";
@@ -3214,18 +3227,18 @@ app.post("/api/inquiries", async (req, res) => {
               <div style="border-bottom: 1px solid #1F2937; padding-bottom: 16px; margin-bottom: 20px;">
                 <span style="background: #1D8FF2; color: #FFFFFF; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; padding: 4px 8px; border-radius: 4px; display: inline-block;">MRS Concierge Dispatch</span>
                 <h2 style="margin: 12px 0 4px 0; color: #FFFFFF; font-size: 20px;">New Portfolio Inquiry</h2>
-                <p style="margin: 0; color: #9CA3AF; font-size: 13px;">Forwarded directly to ${destinationEmail} via Gmail SMTP</p>
+                <p style="margin: 0; color: #9CA3AF; font-size: 13px;">Forwarded directly to ${escapeHtml(destinationEmail)} via Gmail SMTP</p>
               </div>
 
               <div style="background: #111827; border: 1px solid #1F2937; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                   <tr>
                     <td style="padding: 6px 0; color: #9CA3AF; width: 100px;"><strong>Sender:</strong></td>
-                    <td style="padding: 6px 0; color: #F3F4F6; font-weight: 600;">${senderName}</td>
+                    <td style="padding: 6px 0; color: #F3F4F6; font-weight: 600;">${safeHtmlName}</td>
                   </tr>
                   <tr>
                     <td style="padding: 6px 0; color: #9CA3AF;"><strong>Email:</strong></td>
-                    <td style="padding: 6px 0; color: #1D8FF2;"><a href="mailto:${senderEmail}" style="color: #1D8FF2; text-decoration: none;">${senderEmail}</a></td>
+                    <td style="padding: 6px 0; color: #1D8FF2;"><a href="mailto:${safeHtmlEmail}" style="color: #1D8FF2; text-decoration: none;">${safeHtmlEmail}</a></td>
                   </tr>
                   <tr>
                     <td style="padding: 6px 0; color: #9CA3AF;"><strong>Time (UTC):</strong></td>
@@ -3236,12 +3249,12 @@ app.post("/api/inquiries", async (req, res) => {
 
               <div style="background: #1A2234; border-left: 4px solid #1D8FF2; border-radius: 4px; padding: 16px; margin-bottom: 20px;">
                 <h4 style="margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; color: #9CA3AF; letter-spacing: 0.05em;">Message Content:</h4>
-                <p style="margin: 0; color: #FFFFFF; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${senderNote}</p>
+                <p style="margin: 0; color: #FFFFFF; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${safeHtmlNote}</p>
               </div>
 
               <div style="text-align: center; border-top: 1px solid #1F2937; padding-top: 16px; margin-top: 24px; font-size: 12px; color: #6B7280;">
                 <p style="margin: 0 0 12px 0;">This email was dispatched autonomously by your MRS Gravatar Concierge.</p>
-                <a href="mailto:${senderEmail}?subject=Re:%20Portfolio%20Inquiry%20-%20MRS" style="display: inline-block; background: #1D8FF2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 18px; border-radius: 6px;">Reply Directly to ${senderName}</a>
+                <a href="mailto:${safeHtmlEmail}?subject=Re:%20Portfolio%20Inquiry%20-%20MRS" style="display: inline-block; background: #1D8FF2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 18px; border-radius: 6px;">Reply Directly to ${safeHtmlName}</a>
               </div>
             </div>
           `,
@@ -3277,12 +3290,14 @@ app.post("/api/inquiries", async (req, res) => {
       console.warn("[Inquiry Log] Failed to log inquiry:", logErr);
     }
 
-    // Persist inquiry to Cloud SQL PostgreSQL database asynchronously
-    try {
-      await saveInquiry(senderName, senderEmail, `[MRS Inquiry] Message from ${senderName}`, senderNote);
-      console.log(`[Cloud SQL] Persisted inquiry from ${senderName} to database.`);
-    } catch (dbErr) {
-      console.warn(`[Cloud SQL] Non-fatal notice: Could not write inquiry to database:`, dbErr);
+    // Persist inquiry to Cloud SQL PostgreSQL database only when SQL_HOST is configured
+    if (process.env.SQL_HOST && process.env.SQL_DB_NAME) {
+      try {
+        await saveInquiry(senderName, senderEmail, `[MRS Inquiry] Message from ${senderName}`, senderNote);
+        console.log(`[Cloud SQL] Persisted inquiry from ${senderName} to database.`);
+      } catch (dbErr) {
+        console.warn(`[Cloud SQL] Non-fatal notice: Could not write inquiry to database:`, dbErr);
+      }
     }
 
     res.json({
@@ -3463,30 +3478,29 @@ app.get("/api/email/preview-update", (req, res) => {
   });
 });
 
-// Synchronize authenticated user with database if available
+// Synchronize verified Firebase user with optional SQL database if configured
 app.post("/api/auth/sync-user", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
-      // Optional token-based sync
       const token = authHeader.split("Bearer ")[1];
-      // If user profile supplied directly in body
-      const { uid, email, displayName, photoUrl } = req.body;
-      if (uid && email) {
+      const decoded = await adminAuth.verifyIdToken(token);
+      if (process.env.SQL_HOST && process.env.SQL_DB_NAME && decoded?.uid && decoded?.email) {
         try {
-          await getOrCreateUser(uid, email, displayName, photoUrl);
+          await getOrCreateUser(decoded.uid, decoded.email, decoded.name, decoded.picture);
         } catch (dbErr) {
           console.warn("Non-fatal Cloud SQL sync warning:", dbErr);
         }
       }
+      return res.json({ success: true, uid: decoded.uid });
     }
-    res.json({ success: true });
-  } catch (error: any) {
-    res.json({ success: true, notice: "Local sync completed" });
+    return res.status(401).json({ error: "Unauthorized: Missing token" });
+  } catch {
+    return res.status(401).json({ error: "Unauthorized: Invalid token" });
   }
 });
 
-// Get user profile by token
+// Get user profile by verified Firebase ID token
 app.get("/api/user/profile", requireAuth, async (req: AuthRequest, res) => {
   try {
     const uid = req.user?.uid;
@@ -3494,8 +3508,16 @@ app.get("/api/user/profile", requireAuth, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Missing user UID in auth token" });
     }
 
-    const userRecord = await getUserByUid(uid);
-    res.json({ success: true, user: userRecord });
+    const userRecord =
+      process.env.SQL_HOST && process.env.SQL_DB_NAME ? await getUserByUid(uid) : null;
+    res.json({
+      success: true,
+      user: userRecord || {
+        uid,
+        email: req.user?.email || null,
+        displayName: req.user?.name || null,
+      },
+    });
   } catch (error: any) {
     console.error("Failed to fetch user profile:", error);
     res.status(500).json({ error: error.message || "Failed to fetch profile" });

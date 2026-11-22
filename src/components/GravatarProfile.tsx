@@ -41,7 +41,7 @@ import {
   BadgeCheck,
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface GravatarProfileProps {
   profile: BioProfile;
@@ -174,19 +174,28 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
 
     setInquiryStatus('sending');
 
+    const trimmedName = inquiryName.trim().slice(0, 100);
+    const rawEmail = inquiryEmail.trim();
+    const validEmail = (rawEmail.length >= 3 ? rawEmail : 'visitor@example.com').slice(0, 128);
+    const trimmedSubject = `Portfolio Inquiry from ${trimmedName}`.slice(0, 200);
+    const trimmedMessage = inquiryNote.trim().slice(0, 2000);
+
+    const result = await onSendInquiry(inquiryName, inquiryEmail, inquiryNote);
+
     try {
       await addDoc(collection(db, 'inquiries'), {
-        name: inquiryName.trim().slice(0, 100),
-        email: (inquiryEmail.trim() || 'visitor@example.com').slice(0, 128),
-        subject: `Portfolio Inquiry from ${inquiryName.trim()}`.slice(0, 200),
-        message: inquiryNote.trim().slice(0, 2000),
+        name: trimmedName,
+        email: validEmail,
+        subject: trimmedSubject,
+        message: trimmedMessage,
         createdAt: new Date().toISOString(),
       });
     } catch (fErr) {
+      if (fErr instanceof Error && fErr.message.toLowerCase().includes('permission')) {
+        handleFirestoreError(fErr, OperationType.CREATE, 'inquiries');
+      }
       console.warn('Non-fatal Firestore inquiry notice:', fErr);
     }
-
-    const result = await onSendInquiry(inquiryName, inquiryEmail, inquiryNote);
 
     const encodedSubject = encodeURIComponent(`Portfolio Inquiry from ${inquiryName}`);
     const encodedBody = encodeURIComponent(
