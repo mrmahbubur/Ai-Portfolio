@@ -1,0 +1,34 @@
+[
+  {
+    "id": "VF-1795081579088-4DFB3F",
+    "timestamp": "2026-11-19T09:46:19.088Z",
+    "monthKey": "2026-11",
+    "fileName": "face_1795081579088_VF-1795081579088-4DFB3F.jpg",
+    "filePath": "/app/applet/data/verified_faces/face_1795081579088_VF-1795081579088-4DFB3F.jpg",
+    "fileSizeBytes": 81371,
+    "verificationMethod": "live_dual_frame_biometric_verified",
+    "confidence": 95,
+    "ip": "2404:1c40:3e1:2049:18e9:61a7:fb82:2282",
+    "country": "Bangladesh",
+    "city": "Barishal",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Mobile Safari/537.36",
+    "deviceType": "Web Client",
+    "emailNotified": false
+  },
+  {
+    "id": "VF-1795081646198-2C1F03",
+    "timestamp": "2026-11-19T09:47:26.198Z",
+    "monthKey": "2026-11",
+    "fileName": "face_1795081646199_VF-1795081646198-2C1F03.jpg",
+    "filePath": "/app/applet/data/verified_faces/face_1795081646199_VF-1795081646198-2C1F03.jpg",
+    "fileSizeBytes": 69466,
+    "verificationMethod": "live_dual_frame_biometric_verified",
+    "confidence": 92,
+    "ip": "2404:1c40:3e1:2049:18e9:61a7:fb82:2282",
+    "country": "Bangladesh",
+    "city": "Barishal",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Mobile Safari/537.36",
+    "deviceType": "Web Client",
+    "emailNotified": false
+  }
+]

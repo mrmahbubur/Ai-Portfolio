@@ -1,0 +1,23 @@
+[
+  {
+    "monthKey": "2026-10",
+    "sentAt": "2026-11-01T00:00:00.000Z",
+    "recipient": "mr216873@gmail.com",
+    "totalRecordsInReport": 3,
+    "status": "sent"
+  },
+  {
+    "monthKey": "2026-10",
+    "sentAt": "2026-11-04T08:41:17.055Z",
+    "recipient": "mr216873@gmail.com",
+    "totalRecordsInReport": 3,
+    "status": "sent"
+  },
+  {
+    "monthKey": "2026-11",
+    "sentAt": "2026-11-06T09:09:09.032Z",
+    "recipient": "mr216873@gmail.com",
+    "totalRecordsInReport": 3,
+    "status": "sent"
+  }
+]

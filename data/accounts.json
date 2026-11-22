@@ -1,0 +1,14 @@
+[
+  {
+    "uid": "usr_698330d4bd02906c",
+    "email": "testvisitor@example.com",
+    "displayName": "Test Visitor",
+    "passwordHash": "8e2009f7aea041240ca0c6d71ab874547efd40ade5cf1116aeae6aabb34cc4207e9e4637aacbc4e7f717ae7121cd8caea2366eb658af996abd9cfd3137628be7",
+    "passwordSalt": "b87d62aff5a9e36e5c7663cedb58f660",
+    "createdAt": "2026-09-03T08:20:50.532Z",
+    "updatedAt": "2026-09-03T08:20:50.532Z",
+    "receivePlatformUpdates": true,
+    "receiveBlogUpdates": true,
+    "emailVerified": false
+  }
+]

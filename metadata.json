@@ -1,0 +1,6 @@
+{
+  "name": "M R S Portfolio & Concierge",
+  "description": "Interactive personal concierge for M R S featuring day/night theme toggle, natural physical animations, synchronized narration, voice, and responsive layout.",
+  "requestFramePermissions": ["microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

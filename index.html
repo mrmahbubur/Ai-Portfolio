@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0B0F19" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="M R S Hub" />
+    <meta name="monetag" content="e0c01c5b3e298e47e870e3cd04c4b72c" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var active = (saved === 'dark' || saved === 'light') ? saved : (systemDark ? 'dark' : 'light');
+          var root = document.documentElement;
+          root.dataset.theme = active;
+          root.classList.toggle('dark', active === 'dark');
+          root.style.colorScheme = active;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', active === 'dark' ? '#0B0F19' : '#F8FAFC');
+        } catch (e) {}
+      })();
+    </script>
+    <title>M R S Portfolio &bull; IT Support Professional &amp; Web Manager</title>
+    <meta name="description" content="IT Support, Remote System Administration, Microsoft Office document workflows, and Web Management. Interactive AI Concierge &amp; Portfolio for M R S." />
+    <link rel="icon" type="image/svg+xml" href="/site.svg" />
+    <link rel="alternate icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="alternate" type="application/rss+xml" title="M R S Platform Updates" href="/rss.xml" />
+    <meta property="og:type" content="profile" />
+    <meta property="og:title" content="M R S &bull; IT Support Professional &amp; Web Manager" />
+    <meta property="og:description" content="Explore remote IT support solutions, web management projects, and interactive AI voice concierge for M R S." />
+    <meta property="og:image" content="/mrs_profile_avatar.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:creator" content="@Mrshahinx" />
+    <meta name="twitter:title" content="M R S &bull; IT Support Professional &amp; Web Manager" />
+    <meta name="twitter:description" content="Explore remote IT support solutions, web management projects, and interactive AI voice concierge for M R S." />
+    <meta name="twitter:image" content="/mrs_profile_avatar.jpg" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "name": "M R S",
+      "alternateName": "Mrshahinx",
+      "jobTitle": "IT Support Professional & Web Manager",
+      "description": "IT support and administrative professional with a proven track record in remote systems troubleshooting, Microsoft Office document systems, and digital platform management.",
+      "email": "mr216873@gmail.com",
+      "telephone": "+8809611056361",
+      "url": "https://gravatar.com/mrxshahin",
+      "image": "/mrs_profile_avatar.jpg",
+      "sameAs": [
+        "https://gravatar.com/mrxshahin",
+        "https://www.linkedin.com/in/mrmahbubur",
+        "https://x.com/Mrshahinx",
+        "https://github.com/mrmahbubur",
+        "https://mrxshahin.wordpress.com",
+        "https://mrxshahin.blogspot.com/",
+        "https://mrmahbubur.github.io/Admin/",
+        "https://mrxshahin.ai.studio/",
+        "https://bsky.app/profile/mrxshahin.bsky.social"
+      ],
+      "knowsAbout": [
+        "Information Technology Support",
+        "Remote System Administration",
+        "Microsoft 365 & Office Workflows",
+        "Document Management",
+        "Web Management & Full-Stack Systems",
+        "Troubleshooting"
+      ]
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-[var(--bg)] text-[var(--text)] antialiased overflow-x-hidden min-h-screen transition-colors duration-200">
+    <div id="root"></div>
+    <script type="speculationrules">
+      {
+        "prefetch": [
+          {
+            "source": "document",
+            "where": {
+              "and": [
+                { "href_matches": "/*" },
+                { "not": { "href_matches": "/api/*" } }
+              ]
+            },
+            "eagerness": "moderate"
+          }
+        ]
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

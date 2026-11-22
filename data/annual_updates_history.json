@@ -1,0 +1,298 @@
+[
+  {
+    "updateId": "annual-upd-2026-1792830181023",
+    "year": 2026,
+    "timestamp": "2026-10-24T08:23:03.498Z",
+    "status": "applied",
+    "summary": "Successfully applied automatic annual update for year 2026. Updated 5 policies and copyright.",
+    "emailNotified": true
+  },
+  {
+    "updateId": "annual-upd-2026-1792830248186",
+    "year": 2026,
+    "timestamp": "2026-10-24T08:24:08.186Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1792830249288",
+    "year": 2026,
+    "timestamp": "2026-10-24T08:24:09.288Z",
+    "status": "applied",
+    "summary": "Successfully applied automatic annual update for year 2026. Updated 5 policies and copyright.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1792830320168",
+    "year": 2026,
+    "timestamp": "2026-10-24T08:25:20.168Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1792830533536",
+    "year": 2026,
+    "timestamp": "2026-10-24T08:28:53.536Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794213859891",
+    "year": 2026,
+    "timestamp": "2026-11-09T08:44:19.891Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794214019830",
+    "year": 2026,
+    "timestamp": "2026-11-09T08:46:59.830Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794214141322",
+    "year": 2026,
+    "timestamp": "2026-11-09T08:49:01.322Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794566100425",
+    "year": 2026,
+    "timestamp": "2026-11-13T10:35:00.425Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794566479335",
+    "year": 2026,
+    "timestamp": "2026-11-13T10:41:19.335Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794566582369",
+    "year": 2026,
+    "timestamp": "2026-11-13T10:43:02.369Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794566690542",
+    "year": 2026,
+    "timestamp": "2026-11-13T10:44:50.542Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794566765279",
+    "year": 2026,
+    "timestamp": "2026-11-13T10:46:05.279Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794566827047",
+    "year": 2026,
+    "timestamp": "2026-11-13T10:47:07.047Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794566921939",
+    "year": 2026,
+    "timestamp": "2026-11-13T10:48:41.939Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794823484563",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:04:44.563Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794823786347",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:09:46.347Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794823972065",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:12:52.065Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794824119713",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:15:19.713Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794824247477",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:17:27.477Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794824986343",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:29:46.343Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794825811195",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:43:31.195Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794825921823",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:45:21.823Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794826676984",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:57:56.984Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794826785746",
+    "year": 2026,
+    "timestamp": "2026-11-16T10:59:45.746Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794930968058",
+    "year": 2026,
+    "timestamp": "2026-11-17T15:56:08.058Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794931177776",
+    "year": 2026,
+    "timestamp": "2026-11-17T15:59:37.776Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794931278336",
+    "year": 2026,
+    "timestamp": "2026-11-17T16:01:18.336Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794978279326",
+    "year": 2026,
+    "timestamp": "2026-11-18T05:04:39.326Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794978522475",
+    "year": 2026,
+    "timestamp": "2026-11-18T05:08:42.475Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794978751044",
+    "year": 2026,
+    "timestamp": "2026-11-18T05:12:31.044Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1794979031419",
+    "year": 2026,
+    "timestamp": "2026-11-18T05:17:11.419Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1795121809804",
+    "year": 2026,
+    "timestamp": "2026-11-19T20:56:49.804Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1795122126073",
+    "year": 2026,
+    "timestamp": "2026-11-19T21:02:06.073Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1795122212337",
+    "year": 2026,
+    "timestamp": "2026-11-19T21:03:32.337Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1795122374312",
+    "year": 2026,
+    "timestamp": "2026-11-19T21:06:14.312Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  },
+  {
+    "updateId": "annual-upd-2026-1795122632070",
+    "year": 2026,
+    "timestamp": "2026-11-19T21:10:32.070Z",
+    "status": "already_up_to_date",
+    "summary": "Policies and copyright are already up to date for year 2026.",
+    "emailNotified": false
+  }
+]

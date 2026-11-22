@@ -1,0 +1,86 @@
+{
+  "effectiveYear": 2026,
+  "lastRunTimestamp": "2026-10-24T08:24:09.288Z",
+  "copyrightText": "© 2024–2026 M R S. All Rights Reserved. IT Support, Remote Systems Administration & Web Solutions.",
+  "ownerEmail": "mr216873@gmail.com",
+  "policies": {
+    "terms-of-service": {
+      "id": "terms-of-service",
+      "title": "Terms of Service & Engagement",
+      "shortDescription": "Official terms of service governing M R S portfolio, consultations, and digital services (2026 Revision).",
+      "lastUpdated": "January 1, 2026",
+      "effectiveYear": 2026,
+      "version": "2026.1.0",
+      "content": [
+        "1. Scope of Engagement: M R S provides certified professional IT Support, Remote System Administration, Cloud and Microsoft 365 Management, and Web Development services. By accessing this platform or engaging services, you agree to these terms.",
+        "2. Professional Code & Ethical Computing: All remote administration, diagnostics, and IT operations strictly adhere to industry safety standards, data integrity, and non-destructive troubleshooting protocols.",
+        "3. Document & CV Verification: Executive CV downloads and credential verification require real-person biometric verification to prevent unauthorized scraping and automated impersonation.",
+        "4. Service Availability & SLA: Services and consultations are provided with high-availability remote diagnostic tools, dedicated ticketing tracking, and direct email escalation via mr216873@gmail.com.",
+        "5. Annual Revalidation: These terms are automatically re-evaluated annually on the backend to maintain full alignment with current international technology and commercial guidelines."
+      ]
+    },
+    "privacy-policy": {
+      "id": "privacy-policy",
+      "title": "Global Privacy & Data Protection Policy",
+      "shortDescription": "Standards protecting visitor privacy, biometric verification data, and contact communications (2026 Edition).",
+      "lastUpdated": "January 1, 2026",
+      "effectiveYear": 2026,
+      "version": "2026.1.0",
+      "content": [
+        "1. Commitment to Privacy: M R S upholds strict confidentiality regarding all client data, system logs, network diagrams, and personal contact details.",
+        "2. Biometric Verification Processing: When human verification is performed for credential downloads, captured face images are analyzed solely for liveness and identity confirmation (ICAO Doc 9303 & ISO/IEC 19794-5 standards). Captures are securely audited in backend storage and a verification notice is dispatched directly to the portfolio owner.",
+        "3. No Third-Party Resale: Personal information, email addresses, and verification files are never sold, rented, or transferred to third-party data brokers.",
+        "4. Rights of Access & Deletion: Visitors may request inspection or deletion of their contact records or verification data at any time by contacting mr216873@gmail.com.",
+        "5. Automated Annual Review: Privacy safeguards and regulatory compliance are automatically updated on an annual basis by the backend governance engine."
+      ]
+    },
+    "verification-policy": {
+      "id": "verification-policy",
+      "title": "Biometric Human Verification & Anti-Abuse Standards",
+      "shortDescription": "Protocols governing facial verification, live snapshot capture, and recruiter integrity (2026 Standards).",
+      "lastUpdated": "January 1, 2026",
+      "effectiveYear": 2026,
+      "version": "2026.1.0",
+      "content": [
+        "1. Purpose: Biometric verification guarantees that requests for executive credentials and formal resumes originate from genuine human professionals, recruiters, and clients, deterring malicious bots and mass scrapers.",
+        "2. Capture & Audit Trail: Upon verification, a high-resolution snapshot is captured, logged with network telemetry in backend storage, and transmitted via secure email to mr216873@gmail.com.",
+        "3. Anti-Spoofing & Liveness: The verification engine utilizes AI Vision and optical symmetry, skin tone, and contrast analysis to detect and reject static photos, masks, anime/cartoons, or synthetic avatars.",
+        "4. Security Compliance: All captured media is stored with cryptographic tracking IDs to maintain verifiable proof of human verification."
+      ]
+    },
+    "cookie-ads-policy": {
+      "id": "cookie-ads-policy",
+      "title": "Advertising, Cookies & Monetization Transparency",
+      "shortDescription": "Disclosures regarding sponsored banner placements, CPM network integrations, and privacy (2026 Policy).",
+      "lastUpdated": "January 1, 2026",
+      "effectiveYear": 2026,
+      "version": "2026.1.0",
+      "content": [
+        "1. Sponsored Ad Placements: To sustain independent research, hosting, and free public IT guides, this site includes selected high-standard advertising banners and sponsored links provided by partner CPM networks.",
+        "2. Sandboxed Display: All ad units are rendered inside sandboxed, isolated frames to prevent any unauthorized scripts from interacting with visitor session data or personal information.",
+        "3. No Tracking of Sensitive Information: Ad slots operate without access to visitor biometric data, inquiry messages, or private conversation logs.",
+        "4. Visitor Choice: Visitors are welcome to navigate all public sections, case studies, and articles with complete freedom."
+      ]
+    },
+    "ai-ethics-policy": {
+      "id": "ai-ethics-policy",
+      "title": "Autonomous Assistant & AI Interaction Policy",
+      "shortDescription": "Guidelines and accountability standards for M R S Assistant (2026 Governance).",
+      "lastUpdated": "January 1, 2026",
+      "effectiveYear": 2026,
+      "version": "2026.1.0",
+      "content": [
+        "1. Transparent Representation: M R S Assistant represents the certified skills, professional background, and verified portfolio of M R S.",
+        "2. Voice & Tone Standards: The voice engine operates strictly with the authentic Claude AI female voice profile (Kore acoustic profile), offering courteous, articulate, and knowledgeable guidance.",
+        "3. Accurate Information: The assistant provides verified details regarding M R S's technical certifications (IT Support, Remote Administration, Web Management) and provides open, helpful technical answers without artificial limits."
+      ]
+    }
+  },
+  "legalComplianceStandards": [
+    "ISO/IEC 19794-5 (Biometric Data Interchange)",
+    "ICAO Doc 9303 (Portrait Verification Compliance)",
+    "GDPR & CCPA Data Transparency Compliant",
+    "W3C Web Accessibility & Privacy Guidelines",
+    "Automated Backend Annual Governance System"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "syncId": "SYNC-1794824049242-AQNCN",
+  "timestamp": "2026-11-16T10:14:09.242Z",
+  "sourceAppletId": "a6510147-723b-4cac-bedf-157fd3baa6a1",
+  "sourceUrl": "https://ais-dev-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app",
+  "targetAssistantUrl": "https://camellia-assistant.ai.studio/",
+  "status": "synchronized",
+  "sharedData": {
+    "portfolioOwner": "M R S",
+    "ownerEmail": "mr216873@gmail.com",
+    "totalVisitorHelpCount": 0,
+    "activeSessionId": "sess-3132372e30",
+    "lastHelpQuery": "Summarize what this page says briefly: https://example.com",
+    "lastHelpCategory": "visitor_qa",
+    "recentVerifiedPersonsCount": 2,
+    "currentYear": 2026
+  }
+}
