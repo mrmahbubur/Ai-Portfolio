@@ -8,6 +8,15 @@ import { getReferralStats } from './promotion.ts';
 import { getCurrentPolicies } from './annualUpdateEngine.ts';
 import { getAssistantSyncStatus } from './assistantBridge.ts';
 
+function escapeHtml(unsafe: unknown): string {
+  return String(unsafe ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export interface VisitorHelpRecord {
   trackingNumber: string; // e.g. "MRS-AID-10001"
   helpId: string;
@@ -751,10 +760,10 @@ Direct recipient: mr216873@gmail.com
               (s) => `
             <div style="padding:10px 14px;background-color:#0B0F19;border:1px solid rgba(255,255,255,0.06);border-radius:8px;font-size:12px;">
               <div style="display:flex;justify-content:space-between;color:#E2B867;font-family:monospace;font-weight:bold;margin-bottom:3px;">
-                <span>${s.trackingNumber} (${s.category})</span>
+                <span>${escapeHtml(s.trackingNumber)} (${escapeHtml(s.category)})</span>
                 <span style="color:#64748B;font-size:11px;">${new Date(s.timestamp).toLocaleDateString()}</span>
               </div>
-              <div style="color:#CBD5E1;">&ldquo;${s.prompt.substring(0, 120)}${s.prompt.length > 120 ? '...' : ''}&rdquo;</div>
+              <div style="color:#CBD5E1;">&ldquo;${escapeHtml(s.prompt.substring(0, 120))}${s.prompt.length > 120 ? '...' : ''}&rdquo;</div>
             </div>
           `
             )
@@ -781,14 +790,14 @@ Direct recipient: mr216873@gmail.com
               (f) => `
             <div style="padding:10px 14px;background-color:#0B0F19;border:1px solid rgba(16,185,129,0.25);border-radius:8px;font-size:12px;">
               <div style="display:flex;justify-content:space-between;color:#10B981;font-family:monospace;font-weight:bold;">
-                <span>${f.id}</span>
+                <span>${escapeHtml(f.id)}</span>
                 <span style="color:#64748B;">${new Date(f.timestamp).toLocaleDateString()}</span>
               </div>
               <div style="color:#CBD5E1;margin-top:2px;">
-                <strong>Location:</strong> ${f.country} ${f.city ? `(${f.city})` : ''} &bull; <strong>Score:</strong> ${f.confidence}%
+                <strong>Location:</strong> ${escapeHtml(f.country)} ${f.city ? `(${escapeHtml(f.city)})` : ''} &bull; <strong>Score:</strong> ${escapeHtml(f.confidence)}%
               </div>
               <div style="color:#64748B;font-size:11px;font-family:monospace;margin-top:1px;">
-                File: ${f.fileName}
+                File: ${escapeHtml(f.fileName)}
               </div>
             </div>
           `
@@ -815,11 +824,11 @@ Direct recipient: mr216873@gmail.com
               (c) => `
             <div style="padding:10px 14px;background-color:#0B0F19;border:1px solid rgba(59,130,246,0.25);border-radius:8px;font-size:12px;">
               <div style="display:flex;justify-content:space-between;color:#60A5FA;font-family:monospace;font-weight:bold;">
-                <span>${c.docUniqueId}</span>
+                <span>${escapeHtml(c.docUniqueId)}</span>
                 <span style="color:#64748B;">${new Date(c.timestamp).toLocaleDateString()}</span>
               </div>
               <div style="color:#CBD5E1;margin-top:2px;">
-                <strong>Device:</strong> ${c.deviceType} (${c.os}) &bull; <strong>Location:</strong> ${c.country}
+                <strong>Device:</strong> ${escapeHtml(c.deviceType)} (${escapeHtml(c.os)}) &bull; <strong>Location:</strong> ${escapeHtml(c.country)}
               </div>
             </div>
           `
@@ -846,10 +855,10 @@ Direct recipient: mr216873@gmail.com
               (inq) => `
             <div style="padding:10px 14px;background-color:#0B0F19;border:1px solid rgba(234,179,8,0.25);border-radius:8px;font-size:12px;">
               <div style="display:flex;justify-content:space-between;color:#FACC15;font-weight:bold;">
-                <span>${inq.name} &lt;${inq.email}&gt;</span>
+                <span>${escapeHtml(inq.name)} &lt;${escapeHtml(inq.email)}&gt;</span>
                 <span style="color:#64748B;font-family:monospace;font-size:11px;">${new Date(inq.timestamp).toLocaleDateString()}</span>
               </div>
-              <div style="color:#CBD5E1;margin-top:3px;">&ldquo;${inq.note.substring(0, 130)}&rdquo;</div>
+              <div style="color:#CBD5E1;margin-top:3px;">&ldquo;${escapeHtml(inq.note.substring(0, 130))}&rdquo;</div>
             </div>
           `
             )
@@ -872,8 +881,8 @@ Direct recipient: mr216873@gmail.com
             .map(
               (r) => `
             <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-              <td style="padding:6px 0;color:#CBD5E1;">${r.source}</td>
-              <td style="padding:6px 0;text-align:right;font-family:monospace;font-weight:bold;color:#E2B867;">${r.hits} hits</td>
+              <td style="padding:6px 0;color:#CBD5E1;">${escapeHtml(r.source)}</td>
+              <td style="padding:6px 0;text-align:right;font-family:monospace;font-weight:bold;color:#E2B867;">${escapeHtml(r.hits)} hits</td>
             </tr>
           `
             )

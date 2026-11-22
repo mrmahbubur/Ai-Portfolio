@@ -9,22 +9,29 @@
           "type": "string",
           "format": "email",
           "description": "Subscriber's email address.",
-          "maxLength": 128
+          "minLength": 3,
+          "maxLength": 128,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
         },
         "name": {
           "type": "string",
           "description": "Optional name or greeting title.",
+          "minLength": 1,
           "maxLength": 100
         },
         "uid": {
           "type": "string",
           "description": "Optional linked Firebase Auth UID.",
-          "maxLength": 128
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
         },
         "subscribedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "ISO timestamp of when the subscription occurred."
+          "description": "ISO timestamp of when the subscription occurred.",
+          "minLength": 10,
+          "maxLength": 64
         },
         "receivePlatformUpdates": {
           "type": "boolean",
@@ -45,28 +52,35 @@
         "name": {
           "type": "string",
           "description": "Full name of the inquiring sender.",
+          "minLength": 1,
           "maxLength": 100
         },
         "email": {
           "type": "string",
           "format": "email",
           "description": "Reply-to email address.",
-          "maxLength": 128
+          "minLength": 3,
+          "maxLength": 128,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
         },
         "subject": {
           "type": "string",
           "description": "Subject of inquiry or project title.",
+          "minLength": 1,
           "maxLength": 200
         },
         "message": {
           "type": "string",
           "description": "Detailed body of the inquiry message.",
+          "minLength": 1,
           "maxLength": 2000
         },
         "createdAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Creation timestamp."
+          "description": "Creation timestamp.",
+          "minLength": 10,
+          "maxLength": 64
         }
       },
       "required": ["name", "email", "subject", "message", "createdAt"]
@@ -79,17 +93,22 @@
         "uid": {
           "type": "string",
           "description": "Firebase Auth user identifier.",
-          "maxLength": 128
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
         },
         "email": {
           "type": "string",
           "format": "email",
           "description": "Account email address.",
-          "maxLength": 128
+          "minLength": 3,
+          "maxLength": 128,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
         },
         "displayName": {
           "type": "string",
           "description": "Display name.",
+          "minLength": 1,
           "maxLength": 100
         },
         "receivePlatformUpdates": {
@@ -103,12 +122,16 @@
         "createdAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Account creation timestamp."
+          "description": "Account creation timestamp.",
+          "minLength": 10,
+          "maxLength": 64
         },
         "updatedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Last settings update timestamp."
+          "description": "Last settings update timestamp.",
+          "minLength": 10,
+          "maxLength": 64
         }
       },
       "required": ["uid", "email", "createdAt"]

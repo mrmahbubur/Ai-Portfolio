@@ -110,6 +110,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setDisplayName(currentUser.displayName || '');
 
         const fetchPreferences = async () => {
+          if (!auth.currentUser || auth.currentUser.uid !== currentUser.uid) return;
+          const userPath = `users/${currentUser.uid}`;
           try {
             const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
             if (userSnap.exists()) {
@@ -125,6 +127,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               }
             }
           } catch (err) {
+            if (err instanceof Error && err.message.toLowerCase().includes('permission')) {
+              handleFirestoreError(err, OperationType.GET, userPath);
+            }
             console.warn('Could not load Firestore preferences:', err);
           }
         };

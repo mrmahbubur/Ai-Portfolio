@@ -3191,9 +3191,20 @@ app.post("/api/inquiries", async (req, res) => {
       return res.status(400).json({ error: "Name and message note are required." });
     }
 
-    const senderName = String(name).trim();
-    const senderEmail = (email && String(email).trim()) || "visitor@mrs-concierge.internal";
-    const senderNote = String(note).trim();
+    const sanitizeInlineHeader = (val: string) => val.replace(/[\r\n]+/g, " ").trim();
+    const stripHtmlMarkup = (val: string) =>
+      val.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    const senderName = stripHtmlMarkup(sanitizeInlineHeader(String(name))).slice(0, 100);
+    const rawEmail = sanitizeInlineHeader(email ? String(email) : "").slice(0, 128);
+    const senderEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)
+      ? rawEmail
+      : "visitor@mrs-concierge.internal";
+    const senderNote = String(note).trim().slice(0, 2000);
+    if (!senderName || !senderNote) {
+      return res.status(400).json({ error: "Valid name and message note are required." });
+    }
+
     const destinationEmail = process.env.GMAIL_RECIPIENT || process.env.GMAIL_USER || "mr216873@gmail.com";
     const gmailUser = process.env.GMAIL_USER || "mr216873@gmail.com";
 

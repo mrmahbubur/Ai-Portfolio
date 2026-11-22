@@ -2,6 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import nodemailer from 'nodemailer';
 
+function escapeHtml(unsafe: unknown): string {
+  return String(unsafe ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export interface SubscriberRecord {
   email: string;
   name?: string;
@@ -130,6 +139,15 @@ export function formatProjectUpdateEmail(project: {
   const note = project.customNote || 
     `M R S has built and published "${project.title}", expanding our ecosystem of verified IT support, digital tools, and remote administration resources. As an active subscriber, here is your curated launch briefing.`;
 
+  const safeTitle = escapeHtml(project.title);
+  const safeCategory = escapeHtml(project.category);
+  const safeBadge = escapeHtml(project.badge || 'NEW LAUNCH');
+  const safeDesc = escapeHtml(project.description);
+  const safeGreeting = escapeHtml(nameGreeting);
+  const safeNote = escapeHtml(note);
+  const safeTagsList = escapeHtml(tagsList);
+  const safeTargetUrl = escapeHtml(targetSiteUrl);
+
   const text = `${nameGreeting}\n\n` +
     `I am Camellia, M R S Assistant, speaking with my signature Claude AI female voice. I am pleased to deliver this official platform launch briefing:\n\n` +
     `============================================================\n` +
@@ -155,12 +173,12 @@ export function formatProjectUpdateEmail(project: {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${project.title} - M R S Platform Launch</title>
+      <title>${safeTitle} - M R S Platform Launch</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #0B0F19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #F8FAFC; -webkit-font-smoothing: antialiased;">
       <!-- Hidden Preheader for Inbox Preview -->
       <div style="display: none; font-size: 1px; color: #0B0F19; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
-        New platform update: ${project.title} (${project.category}). Curated briefing and official access from Camellia (M R S Assistant).
+        New platform update: ${safeTitle} (${safeCategory}). Curated briefing and official access from Camellia (M R S Assistant).
       </div>
 
       <div style="max-width: 620px; margin: 24px auto; background: #131B2E; border: 1px solid rgba(226, 184, 103, 0.35); border-radius: 16px; overflow: hidden; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);">
@@ -175,11 +193,11 @@ export function formatProjectUpdateEmail(project: {
               M R S PORTFOLIO &amp; PLATFORM HUB
             </div>
             <span style="background: rgba(226, 184, 103, 0.16); color: #E2B867; border: 1px solid rgba(226, 184, 103, 0.45); font-size: 10px; font-family: ui-monospace, monospace; font-weight: 700; text-transform: uppercase; padding: 3px 10px; border-radius: 9999px; letter-spacing: 0.05em;">
-              ${project.badge || 'NEW LAUNCH'}
+              ${safeBadge}
             </span>
           </div>
           <h1 style="margin: 0 0 6px 0; font-size: 23px; font-weight: 700; color: #FFFFFF; font-family: Georgia, 'Times New Roman', serif; line-height: 1.3;">
-            Platform Update: ${project.title}
+            Platform Update: ${safeTitle}
           </h1>
           <p style="margin: 0; font-size: 13px; color: #94A3B8; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
             Curated announcement delivered by Camellia (M R S Assistant) • Speaking with Claude AI Female Voice
@@ -188,14 +206,14 @@ export function formatProjectUpdateEmail(project: {
 
         <!-- Assistant Greeting & Commentary -->
         <div style="padding: 26px 30px 14px 30px;">
-          <p style="margin: 0 0 16px 0; font-size: 15px; color: #E2E8F0; line-height: 1.6;">${nameGreeting}</p>
+          <p style="margin: 0 0 16px 0; font-size: 15px; color: #E2E8F0; line-height: 1.6;">${safeGreeting}</p>
           
           <div style="background: #0B0F19; border-left: 3px solid #E2B867; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);">
             <div style="font-family: ui-monospace, monospace; font-size: 10px; color: #E2B867; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">
               AI Concierge Briefing
             </div>
             <p style="margin: 0; font-size: 14px; line-height: 1.65; color: #CBD5E1; font-style: italic;">
-              "${note}"
+              "${safeNote}"
             </p>
             <div style="margin-top: 10px; font-size: 12px; color: #E2B867; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
               — Camellia, M R S Assistant (Claude AI Female Voice Model • Personal Concierge for M R S)
@@ -205,27 +223,27 @@ export function formatProjectUpdateEmail(project: {
           <!-- Feature Spotlight Card -->
           <div style="background: #182238; border: 1px solid #2A3859; border-radius: 12px; padding: 22px; margin-bottom: 24px;">
             <div style="font-family: ui-monospace, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #E2B867; font-weight: 700; margin-bottom: 8px;">
-              ${project.category}
+              ${safeCategory}
             </div>
             <h2 style="margin: 0 0 10px 0; font-size: 19px; color: #FFFFFF; font-weight: 700; font-family: Georgia, serif;">
-              ${project.title}
+              ${safeTitle}
             </h2>
             <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #CBD5E1;">
-              ${project.description}
+              ${safeDesc}
             </p>
             
             <div style="background: #0F172A; border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; border: 1px solid #1E293B;">
               <span style="font-family: ui-monospace, monospace; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">System Stack:</span>
-              <span style="font-family: ui-monospace, monospace; font-size: 11px; color: #E2B867; margin-left: 6px;">${tagsList}</span>
+              <span style="font-family: ui-monospace, monospace; font-size: 11px; color: #E2B867; margin-left: 6px;">${safeTagsList}</span>
             </div>
             
             <!-- Primary Action Button: THIS SITE LINK ONLY -->
             <div>
-              <a href="${targetSiteUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: linear-gradient(135deg, #E2B867 0%, #D4A045 100%); color: #0B0F19; font-weight: 800; font-size: 13px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; padding: 13px 28px; border-radius: 8px; box-shadow: 0 4px 14px rgba(226, 184, 103, 0.35); text-align: center;">
+              <a href="${safeTargetUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: linear-gradient(135deg, #E2B867 0%, #D4A045 100%); color: #0B0F19; font-weight: 800; font-size: 13px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; padding: 13px 28px; border-radius: 8px; box-shadow: 0 4px 14px rgba(226, 184, 103, 0.35); text-align: center;">
                 Explore on This Site ↗
               </a>
               <div style="margin-top: 10px; font-family: ui-monospace, monospace; font-size: 11px; color: #94A3B8;">
-                Direct link: <a href="${targetSiteUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: underline; word-break: break-all;">${targetSiteUrl}</a>
+                Direct link: <a href="${safeTargetUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: underline; word-break: break-all;">${safeTargetUrl}</a>
               </div>
             </div>
           </div>
@@ -336,13 +354,13 @@ export function formatWelcomeSubscriberEmail(recipientEmail: string, recipientNa
             Welcome to M R S Updates
           </h1>
           <p style="margin: 0; font-size: 13px; color: #94A3B8; font-family: ui-monospace, monospace;">
-            Subscribed with ${recipientEmail}
+            Subscribed with ${escapeHtml(recipientEmail)}
           </p>
         </div>
 
         <!-- Body -->
         <div style="padding: 26px 30px;">
-          <p style="margin: 0 0 16px 0; font-size: 15px; color: #E2E8F0; line-height: 1.6;">${nameGreeting}</p>
+          <p style="margin: 0 0 16px 0; font-size: 15px; color: #E2E8F0; line-height: 1.6;">${escapeHtml(nameGreeting)}</p>
           
           <div style="background: #0B0F19; border-left: 3px solid #E2B867; border-radius: 10px; padding: 16px 20px; margin-bottom: 22px; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);">
             <div style="font-family: ui-monospace, monospace; font-size: 10px; color: #E2B867; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">
