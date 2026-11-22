@@ -1,15 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import nodemailer from 'nodemailer';
-
-function escapeHtml(unsafe: unknown): string {
-  return String(unsafe ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml, safeEmailHref, sanitizeEmailSubject, stripHtmlTags } from './emailSanitizer.ts';
 
 export interface SubscriberRecord {
   email: string;
@@ -110,12 +102,9 @@ export function removeSubscriber(email: string): boolean {
 // Official featured platform and interactive projects hub
 export const FEATURED_PLATFORM_URL = 'https://mrxshahin.ai.studio/';
 
-// Helper to clean and format site URL ensuring no trailing slashes
+// Helper to clean and format site URL ensuring strict http/https protocol & no trailing slashes
 export function cleanSiteUrl(url?: string): string {
-  if (!url || typeof url !== 'string' || !url.startsWith('http')) {
-    return 'https://ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app';
-  }
-  return url.trim().replace(/\/+$/, '');
+  return safeEmailHref(url);
 }
 
 // Generate the customized email update crafted by Camellia (M R S Assistant)
@@ -132,14 +121,16 @@ export function formatProjectUpdateEmail(project: {
 }): { subject: string; text: string; html: string } {
   // Target site URL for this specific release
   const targetSiteUrl = cleanSiteUrl(project.siteUrl || project.link);
-  const featuredPlatformUrl = FEATURED_PLATFORM_URL;
-  const subject = `🚀 New Platform Alert: "${project.title}" is now Live on M R S Portfolio`;
-  const nameGreeting = project.recipientName ? `Hello ${project.recipientName},` : 'Hello,';
+  const featuredPlatformUrl = cleanSiteUrl(FEATURED_PLATFORM_URL);
+  const cleanRecipientName = project.recipientName ? stripHtmlTags(project.recipientName).slice(0, 100) : '';
+  const cleanTitle = stripHtmlTags(project.title).slice(0, 200) || 'Portfolio Update';
+  const subject = sanitizeEmailSubject(`🚀 New Platform Alert: "${cleanTitle}" is now Live on M R S Portfolio`);
+  const nameGreeting = cleanRecipientName ? `Hello ${cleanRecipientName},` : 'Hello,';
   const tagsList = project.tags && project.tags.length > 0 ? project.tags.join(' • ') : project.category;
   const note = project.customNote || 
-    `M R S has built and published "${project.title}", expanding our ecosystem of verified IT support, digital tools, and remote administration resources. As an active subscriber, here is your curated launch briefing.`;
+    `M R S has built and published "${cleanTitle}", expanding our ecosystem of verified IT support, digital tools, and remote administration resources. As an active subscriber, here is your curated launch briefing.`;
 
-  const safeTitle = escapeHtml(project.title);
+  const safeTitle = escapeHtml(cleanTitle);
   const safeCategory = escapeHtml(project.category);
   const safeBadge = escapeHtml(project.badge || 'NEW LAUNCH');
   const safeDesc = escapeHtml(project.description);
@@ -147,6 +138,7 @@ export function formatProjectUpdateEmail(project: {
   const safeNote = escapeHtml(note);
   const safeTagsList = escapeHtml(tagsList);
   const safeTargetUrl = escapeHtml(targetSiteUrl);
+  const safeFeaturedUrl = escapeHtml(featuredPlatformUrl);
 
   const text = `${nameGreeting}\n\n` +
     `I am Camellia, M R S Assistant, speaking with my signature Claude AI female voice. I am pleased to deliver this official platform launch briefing:\n\n` +
@@ -288,13 +280,13 @@ export function formatProjectUpdateEmail(project: {
             M R S • Certified IT Support Professional, Web Manager &amp; Digital Entrepreneur
           </p>
           <p style="margin: 0 0 6px 0; font-family: ui-monospace, monospace; font-size: 11px;">
-            <a href="${featuredPlatformUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: none; font-weight: 700;">
-              Featured Platform &amp; Projects: ${featuredPlatformUrl}
+            <a href="${safeFeaturedUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: none; font-weight: 700;">
+              Featured Platform &amp; Projects: ${safeFeaturedUrl}
             </a>
           </p>
           <p style="margin: 0; font-family: ui-monospace, monospace; font-size: 11px;">
-            <a href="${targetSiteUrl}" target="_blank" rel="noopener noreferrer" style="color: #94A3B8; text-decoration: none;">
-              Visit M R S Official Site (${targetSiteUrl})
+            <a href="${safeTargetUrl}" target="_blank" rel="noopener noreferrer" style="color: #94A3B8; text-decoration: none;">
+              Visit M R S Official Site (${safeTargetUrl})
             </a>
           </p>
         </div>
@@ -310,9 +302,12 @@ export function formatProjectUpdateEmail(project: {
 // Generate the welcome confirmation email for new subscribers
 export function formatWelcomeSubscriberEmail(recipientEmail: string, recipientName?: string, siteUrl?: string): { subject: string; text: string; html: string } {
   const targetSiteUrl = cleanSiteUrl(siteUrl);
-  const featuredPlatformUrl = FEATURED_PLATFORM_URL;
+  const featuredPlatformUrl = cleanSiteUrl(FEATURED_PLATFORM_URL);
+  const safeTargetUrl = escapeHtml(targetSiteUrl);
+  const safeFeaturedUrl = escapeHtml(featuredPlatformUrl);
+  const cleanRecipientName = recipientName ? stripHtmlTags(recipientName).slice(0, 100) : '';
   const subject = `✨ Always Connected: You are Subscribed to M R S Platform & Project Updates`;
-  const nameGreeting = recipientName ? `Hello ${recipientName},` : 'Hello,';
+  const nameGreeting = cleanRecipientName ? `Hello ${cleanRecipientName},` : 'Hello,';
 
   const text = `${nameGreeting}\n\n` +
     `I am Camellia, M R S Assistant, speaking with my signature Claude AI female voice as the personal AI representative and concierge for M R S.\n\n` +
@@ -388,11 +383,11 @@ export function formatWelcomeSubscriberEmail(recipientEmail: string, recipientNa
 
           <!-- Primary CTA Button & Featured Platform Links -->
           <div style="text-align: left; margin-bottom: 18px;">
-            <a href="${targetSiteUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: linear-gradient(135deg, #E2B867 0%, #D4A045 100%); color: #0B0F19; font-weight: 800; font-size: 13px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; padding: 12px 26px; border-radius: 8px; box-shadow: 0 4px 14px rgba(226, 184, 103, 0.35);">
+            <a href="${safeTargetUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: linear-gradient(135deg, #E2B867 0%, #D4A045 100%); color: #0B0F19; font-weight: 800; font-size: 13px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; padding: 12px 26px; border-radius: 8px; box-shadow: 0 4px 14px rgba(226, 184, 103, 0.35);">
               Explore on This Site ↗
             </a>
             <div style="margin-top: 8px; font-family: ui-monospace, monospace; font-size: 11px; color: #94A3B8;">
-              Direct link: <a href="${targetSiteUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: underline; word-break: break-all;">${targetSiteUrl}</a>
+              Direct link: <a href="${safeTargetUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: underline; word-break: break-all;">${safeTargetUrl}</a>
             </div>
           </div>
 
@@ -404,8 +399,8 @@ export function formatWelcomeSubscriberEmail(recipientEmail: string, recipientNa
             <div style="font-size: 12px; color: #CBD5E1; margin-bottom: 8px;">
               Interactive voice AI concierge, full digital showcase &amp; project index:
             </div>
-            <a href="${featuredPlatformUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; color: #E2B867; font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; text-decoration: underline; word-break: break-all;">
-              ${featuredPlatformUrl} ↗
+            <a href="${safeFeaturedUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; color: #E2B867; font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; text-decoration: underline; word-break: break-all;">
+              ${safeFeaturedUrl} ↗
             </a>
           </div>
         </div>
@@ -416,13 +411,13 @@ export function formatWelcomeSubscriberEmail(recipientEmail: string, recipientNa
             M R S • Certified IT Support Professional &amp; Web Manager
           </p>
           <p style="margin: 0 0 6px 0; font-family: ui-monospace, monospace; font-size: 11px;">
-            <a href="${featuredPlatformUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: none; font-weight: 700;">
-              Featured Platform: ${featuredPlatformUrl}
+            <a href="${safeFeaturedUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: none; font-weight: 700;">
+              Featured Platform: ${safeFeaturedUrl}
             </a>
           </p>
           <p style="margin: 0; font-family: ui-monospace, monospace; font-size: 11px;">
-            <a href="${targetSiteUrl}" target="_blank" rel="noopener noreferrer" style="color: #94A3B8; text-decoration: none;">
-              Visit M R S Official Site (${targetSiteUrl})
+            <a href="${safeTargetUrl}" target="_blank" rel="noopener noreferrer" style="color: #94A3B8; text-decoration: none;">
+              Visit M R S Official Site (${safeTargetUrl})
             </a>
           </p>
         </div>

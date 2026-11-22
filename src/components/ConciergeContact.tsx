@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
 import { SocialLinks } from '../types';
-import { Mail, Calendar, Linkedin, Github, Twitter, Globe, BookOpen, ExternalLink, Send, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Mail, Calendar, Linkedin, Github, Twitter, Globe, BookOpen, ExternalLink, Send, CheckCircle2, MessageSquare, AlertCircle } from 'lucide-react';
+import {
+  INPUT_LIMITS,
+  isValidEmailAddress,
+  sanitizeEmailInput,
+  sanitizeMultilineText,
+  sanitizeSafeHref,
+  sanitizeSingleLineText,
+} from '../utils/inputSanitization';
 
 interface ConciergeContactProps {
   socials?: SocialLinks;
-  onSendInquiry: (name: string, email: string, note: string) => void;
+  onSendInquiry: (name: string, email: string, note: string) => Promise<any> | void;
 }
 
 const DEFAULT_SOCIALS: SocialLinks = {
@@ -26,21 +34,56 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
 
   const activeSocials = { ...DEFAULT_SOCIALS, ...socials };
-  const safeEmail = activeSocials.email || 'mr216873@gmail.com';
-  const gravatarUrl = activeSocials.gravatarUrl || 'https://gravatar.com/mrxshahin';
+  const safeEmail = isValidEmailAddress(activeSocials.email || '')
+    ? sanitizeEmailInput(activeSocials.email)
+    : 'mr216873@gmail.com';
+  const safeCalendlyUrl = sanitizeSafeHref(activeSocials.calendlyUrl);
+  const safeLinkedinUrl = sanitizeSafeHref(activeSocials.linkedinUrl);
+  const safeGithubUrl = sanitizeSafeHref(activeSocials.githubUrl);
+  const safeXUrl = sanitizeSafeHref(activeSocials.xUrl);
+  const safeBlueskyUrl = sanitizeSafeHref(activeSocials.blueskyUrl);
+  const safeWordpressUrl = sanitizeSafeHref(activeSocials.wordpressUrl);
+  const safeGoodreadsUrl = sanitizeSafeHref(activeSocials.goodreadsUrl);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !note.trim()) return;
-    onSendInquiry(name, email || 'guest@portfolio.com', note);
-    setSent(true);
-    setName('');
-    setEmail('');
-    setNote('');
-    setTimeout(() => setSent(false), 8000);
+    setErrorMsg(null);
+
+    const cleanName = sanitizeSingleLineText(name, INPUT_LIMITS.NAME_MAX);
+    const rawCleanEmail = sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
+    const cleanNote = sanitizeMultilineText(note, INPUT_LIMITS.MESSAGE_MAX);
+
+    if (!cleanName) {
+      setErrorMsg('Please enter your name or organization.');
+      return;
+    }
+    if (rawCleanEmail && !isValidEmailAddress(rawCleanEmail)) {
+      setErrorMsg('Please provide a valid email address or leave the optional email blank.');
+      return;
+    }
+    if (!cleanNote) {
+      setErrorMsg('Please enter a message before sending.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSendInquiry(cleanName, rawCleanEmail || 'guest@portfolio.com', cleanNote);
+      setSent(true);
+      setName('');
+      setEmail('');
+      setNote('');
+      setTimeout(() => setSent(false), 8000);
+    } catch {
+      setErrorMsg('Unable to dispatch inquiry right now. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -77,11 +120,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
 
           {/* Social Network Tiles */}
           <div className="grid grid-cols-2 gap-2.5">
-            {activeSocials.calendlyUrl && (
+            {safeCalendlyUrl && (
               <a
-                href={activeSocials.calendlyUrl}
+                href={safeCalendlyUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl bg-[var(--panel)] hover:bg-[var(--panel-hover)] shadow-[var(--shadow-card)] transition-all group"
               >
                 <div className="flex items-center gap-2">
@@ -105,11 +148,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
               <ExternalLink className="w-3 h-3 text-[var(--text-muted)] group-hover:text-[var(--gold)]" />
             </a>
 
-            {activeSocials.linkedinUrl && (
+            {safeLinkedinUrl && (
               <a
-                href={activeSocials.linkedinUrl}
+                href={safeLinkedinUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl bg-[var(--panel)] hover:bg-[var(--panel-hover)] shadow-[var(--shadow-card)] transition-all group"
               >
                 <div className="flex items-center gap-2">
@@ -120,11 +163,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
               </a>
             )}
 
-            {activeSocials.githubUrl && (
+            {safeGithubUrl && (
               <a
-                href={activeSocials.githubUrl}
+                href={safeGithubUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl bg-[var(--panel)] hover:bg-[var(--panel-hover)] shadow-[var(--shadow-card)] transition-all group"
               >
                 <div className="flex items-center gap-2">
@@ -135,11 +178,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
               </a>
             )}
 
-            {activeSocials.xUrl && (
+            {safeXUrl && (
               <a
-                href={activeSocials.xUrl}
+                href={safeXUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl bg-[var(--panel)] hover:bg-[var(--panel-hover)] shadow-[var(--shadow-card)] transition-all group"
               >
                 <div className="flex items-center gap-2">
@@ -150,11 +193,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
               </a>
             )}
 
-            {activeSocials.blueskyUrl && (
+            {safeBlueskyUrl && (
               <a
-                href={activeSocials.blueskyUrl}
+                href={safeBlueskyUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl bg-[var(--panel)] hover:bg-[var(--panel-hover)] shadow-[var(--shadow-card)] transition-all group"
               >
                 <div className="flex items-center gap-2">
@@ -165,11 +208,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
               </a>
             )}
 
-            {activeSocials.wordpressUrl && (
+            {safeWordpressUrl && (
               <a
-                href={activeSocials.wordpressUrl}
+                href={safeWordpressUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl bg-[var(--panel)] hover:bg-[var(--panel-hover)] shadow-[var(--shadow-card)] transition-all group"
               >
                 <div className="flex items-center gap-2">
@@ -180,11 +223,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
               </a>
             )}
 
-            {activeSocials.goodreadsUrl && (
+            {safeGoodreadsUrl && (
               <a
-                href={activeSocials.goodreadsUrl}
+                href={safeGoodreadsUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl bg-[var(--panel)] hover:bg-[var(--panel-hover)] shadow-[var(--shadow-card)] transition-all group"
               >
                 <div className="flex items-center gap-2">
@@ -213,7 +256,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
                 type="text"
                 placeholder="Your Name or Organization"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                maxLength={INPUT_LIMITS.NAME_MAX}
+                onChange={(e) => {
+                  setName(e.target.value.slice(0, INPUT_LIMITS.NAME_MAX));
+                  if (errorMsg) setErrorMsg(null);
+                }}
                 required
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg)] ring-1 ring-[var(--border)] text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--gold)]"
               />
@@ -224,7 +271,11 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
                 type="email"
                 placeholder="Your Contact Email (Optional)"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                maxLength={INPUT_LIMITS.EMAIL_MAX}
+                onChange={(e) => {
+                  setEmail(e.target.value.slice(0, INPUT_LIMITS.EMAIL_MAX));
+                  if (errorMsg) setErrorMsg(null);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg)] ring-1 ring-[var(--border)] text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--gold)]"
               />
             </div>
@@ -234,18 +285,33 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
                 rows={3}
                 placeholder="How can M R S assist with your IT, Web, or Entrepreneurship needs?"
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                maxLength={INPUT_LIMITS.MESSAGE_MAX}
+                onChange={(e) => {
+                  setNote(e.target.value.slice(0, INPUT_LIMITS.MESSAGE_MAX));
+                  if (errorMsg) setErrorMsg(null);
+                }}
                 required
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg)] ring-1 ring-[var(--border)] text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--gold)] resize-none"
               />
+              <div className="flex justify-end mt-1 font-mono text-[10px] text-[var(--text-muted)]">
+                {note.length} / {INPUT_LIMITS.MESSAGE_MAX}
+              </div>
             </div>
+
+            {errorMsg && (
+              <div role="alert" className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/10 text-[var(--danger-text)] font-mono text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
             <button
               type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--gold)] hover:bg-[var(--gold-hover)] text-[var(--gold-ink)] text-xs font-mono tracking-wide font-semibold transition-all cursor-pointer shadow-sm"
+              disabled={isSubmitting}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--gold)] hover:bg-[var(--gold-hover)] disabled:opacity-50 text-[var(--gold-ink)] text-xs font-mono tracking-wide font-semibold transition-all cursor-pointer shadow-sm"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Send Message to mr216873@gmail.com</span>
+              <span>{isSubmitting ? 'Sending...' : 'Send Message to mr216873@gmail.com'}</span>
             </button>
 
             {sent && (

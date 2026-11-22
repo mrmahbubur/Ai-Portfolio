@@ -28,6 +28,13 @@ import {
   getUpdatesHistory,
 } from "./src/server/subscribers.ts";
 import {
+  escapeHtml,
+  safeEmailHref,
+  sanitizeEmailSubject,
+  stripCrlf,
+  stripHtmlTags,
+} from "./src/server/emailSanitizer.ts";
+import {
   generateSocialSharePacks,
   generateRssFeed,
   generateSitemapXml,
@@ -1687,7 +1694,9 @@ async function sendCvDownloadNotificationEmail(info: {
     ? `${Math.floor(t.sessionDurationSeconds / 60)}m ${t.sessionDurationSeconds % 60}s (${t.sessionDurationSeconds} seconds total)`
     : "Immediate Download";
 
-  const mapLink = geo?.lat && geo?.lon ? `https://www.google.com/maps?q=${geo.lat},${geo.lon}` : "";
+  const safeLat = geo?.lat !== undefined && Number.isFinite(Number(geo.lat)) ? Number(geo.lat) : null;
+  const safeLon = geo?.lon !== undefined && Number.isFinite(Number(geo.lon)) ? Number(geo.lon) : null;
+  const mapLink = safeLat !== null && safeLon !== null ? `https://www.google.com/maps?q=${safeLat},${safeLon}` : "";
 
   // Prepare attachments if face capture image is present
   const attachments: Array<{ filename: string; content: Buffer; cid?: string; contentType?: string }> = [];
@@ -1769,6 +1778,47 @@ ${info.headers?.["sec-ch-ua-mobile"] ? `• Sec-CH-UA-Mobile: ${info.headers["se
 Dispatched automatically from your M R S Portfolio Backend.
   `.trim();
 
+  const safeDateFormatted = escapeHtml(dateFormatted);
+  const safeFilename = escapeHtml(info.filename || "M R S CV.pdf");
+  const safeDocUniqueId = escapeHtml(docUniqueId);
+  const safeDownloadMethod = escapeHtml(info.downloadMethod || "Direct Download");
+  const safeIp = escapeHtml(info.ip);
+  const safeCountryCode = geo?.countryCode ? escapeHtml(geo.countryCode) : "";
+  const safeCountry = escapeHtml(geo?.country || "Unknown Country");
+  const safeRegion = geo?.regionName ? escapeHtml(geo.regionName) : "";
+  const safeCity = escapeHtml(geo?.city || "Unknown City");
+  const safeZip = geo?.zip ? escapeHtml(geo.zip) : "";
+  const safeIsp = escapeHtml(geo?.isp || "Unknown Provider");
+  const safeOrg = geo?.org ? escapeHtml(geo.org) : "";
+  const safeAs = geo?.as ? escapeHtml(geo.as) : "";
+  const safeDeviceType = escapeHtml(parsed.deviceType);
+  const safeScreenRes = escapeHtml(t.screenResolution || "Not reported");
+  const safeViewportSize = t.viewportSize ? escapeHtml(t.viewportSize) : "";
+  const safePixelRatio = t.devicePixelRatio ? escapeHtml(t.devicePixelRatio) : "";
+  const safeGpuRenderer = t.gpuRenderer ? escapeHtml(t.gpuRenderer) : "";
+  const safeGpuVendor = t.gpuVendor ? escapeHtml(t.gpuVendor) : "";
+  const safeCpuRam = escapeHtml([t.cores, t.deviceMemory].filter(Boolean).join(" · ") || "Not reported by client");
+  const safeTouchSupport = escapeHtml(t.touchSupport || "Mouse / Keyboard");
+  const safeBatteryLevel = t.batteryLevel ? escapeHtml(t.batteryLevel) : "";
+  const safeOs = escapeHtml(parsed.os);
+  const safePlatform = t.platform ? escapeHtml(t.platform) : "";
+  const safeBrowser = escapeHtml(parsed.browser);
+  const safeLocalTime = escapeHtml(localTimeStr);
+  const safeTimezone = t.timezone ? escapeHtml(t.timezone) : "";
+  const safeTimezoneOffset = t.timezoneOffset ? escapeHtml(t.timezoneOffset) : "";
+  const safeLang = escapeHtml(t.languages || t.primaryLanguage || info.headers?.["accept-language"] || "Not reported");
+  const safeEnvFeatures = escapeHtml(
+    [t.colorSchemePreference, t.cookiesEnabled !== false ? "Cookies OK" : "Cookies Disabled", t.webAssemblySupported ? "Wasm OK" : "", t.pdfViewerEnabled ? "Native PDF" : ""].filter(Boolean).join(" · ")
+  );
+  const safeSessionDuration = escapeHtml(sessionDurationStr);
+  const safeReferrer = escapeHtml(t.referrer || info.headers?.referer || "Direct Access / Bookmark");
+  const safePageUrl = escapeHtml(t.url || info.headers?.referer || "Direct API Request");
+  const safeUtmSummary = escapeHtml(
+    [t.utmSource ? `Source: ${t.utmSource}` : "", t.utmMedium ? `Medium: ${t.utmMedium}` : "", t.utmCampaign ? `Campaign: ${t.utmCampaign}` : ""].filter(Boolean).join(" | ")
+  );
+  const safeUserAgent = escapeHtml(info.userAgent);
+  const safeSubjectHeader = sanitizeEmailSubject(emailSubject);
+
   const htmlContent = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 680px; margin: 0 auto; background: #0B0F19; color: #E5E7EB; border: 1px solid #1F2937; border-radius: 14px; padding: 26px; box-shadow: 0 8px 30px rgba(0,0,0,0.6);">
       
@@ -1776,10 +1826,10 @@ Dispatched automatically from your M R S Portfolio Backend.
       <div style="border-bottom: 1px solid #1F2937; padding-bottom: 18px; margin-bottom: 22px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
           <span style="background: linear-gradient(135deg, #C5A059, #E2B867); color: #0B0F19; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; padding: 5px 10px; border-radius: 6px; display: inline-block;">MRS Executive CV Audit</span>
-          <span style="font-size: 12px; color: #9CA3AF; font-family: monospace;">${dateFormatted}</span>
+          <span style="font-size: 12px; color: #9CA3AF; font-family: monospace;">${safeDateFormatted}</span>
         </div>
         <h2 style="margin: 0 0 6px 0; color: #FFFFFF; font-size: 22px; font-weight: 700;">Official CV Download Detected</h2>
-        <p style="margin: 0; color: #9CA3AF; font-size: 13.5px;">File: <strong style="color: #E2B867;">${info.filename || "M R S CV.pdf"}</strong> &nbsp;·&nbsp; Serial: <strong style="color: #60A5FA; font-family: monospace;">${docUniqueId}</strong> &nbsp;·&nbsp; Channel: <span style="color: #A7F3D0;">${info.downloadMethod || "Direct Download"}</span></p>
+        <p style="margin: 0; color: #9CA3AF; font-size: 13.5px;">File: <strong style="color: #E2B867;">${safeFilename}</strong> &nbsp;·&nbsp; Serial: <strong style="color: #60A5FA; font-family: monospace;">${safeDocUniqueId}</strong> &nbsp;·&nbsp; Channel: <span style="color: #A7F3D0;">${safeDownloadMethod}</span></p>
       </div>
 
       <!-- Unique Document Verification Serial Card -->
@@ -1790,7 +1840,7 @@ Dispatched automatically from your M R S Portfolio Backend.
               📄 Official Document Tracking Serial
             </span>
             <span style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 18px; font-weight: 800; color: #E2B867; letter-spacing: 0.06em;">
-              ${docUniqueId}
+              ${safeDocUniqueId}
             </span>
           </div>
           <div style="text-align: right;">
@@ -1805,7 +1855,7 @@ Dispatched automatically from your M R S Portfolio Backend.
       </div>
 
       ${
-        hasFaceCapture
+        faceCid
           ? `
       <!-- Verified Visitor Biometric Face Capture Card -->
       <div style="background: #111827; border: 2px solid #E2B867; border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align: center; box-shadow: 0 4px 20px rgba(226, 184, 103, 0.18);">
@@ -1818,7 +1868,7 @@ Dispatched automatically from your M R S Portfolio Backend.
           </span>
         </div>
         <div style="margin: 10px auto; display: inline-block; text-align: center;">
-          <img src="${faceCid ? `cid:${faceCid}` : info.faceCapture}" alt="Verified Visitor Face" style="max-width: 380px; width: 100%; border-radius: 10px; border: 2px solid #374151; box-shadow: 0 6px 20px rgba(0,0,0,0.6); display: block; margin: 0 auto;" />
+          <img src="cid:${faceCid}" alt="Verified Visitor Face" style="max-width: 380px; width: 100%; border-radius: 10px; border: 2px solid #374151; box-shadow: 0 6px 20px rgba(0,0,0,0.6); display: block; margin: 0 auto;" />
         </div>
         <p style="margin: 10px 0 0 0; font-size: 12px; color: #9CA3AF;">
           Optical snapshot captured during ICAO Doc 9303 &amp; ISO/IEC 19794-5 biometric human verification (full face, hair, and both ears confirmed).
@@ -1831,34 +1881,34 @@ Dispatched automatically from your M R S Portfolio Backend.
       <div style="background: #111827; border: 1px solid #1F2937; border-radius: 10px; padding: 18px; margin-bottom: 16px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #1F2937; padding-bottom: 8px;">
           <h3 style="margin: 0; font-size: 13px; text-transform: uppercase; color: #E2B867; letter-spacing: 0.08em;">📍 1. Geographical & Network Location</h3>
-          ${geo?.countryCode ? `<span style="background: #1F2937; color: #F3F4F6; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;">${geo.countryCode}</span>` : ""}
+          ${safeCountryCode ? `<span style="background: #1F2937; color: #F3F4F6; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;">${safeCountryCode}</span>` : ""}
         </div>
         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF; width: 140px;"><strong>IP Address:</strong></td>
-            <td style="padding: 5px 0; color: #60A5FA; font-family: monospace; font-weight: 600;">${info.ip}</td>
+            <td style="padding: 5px 0; color: #60A5FA; font-family: monospace; font-weight: 600;">${safeIp}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Country / State:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;"><strong>${geo?.country || "Unknown Country"}</strong> ${geo?.regionName ? `(${geo.regionName})` : ""}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;"><strong>${safeCountry}</strong> ${safeRegion ? `(${safeRegion})` : ""}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>City & Postal:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${geo?.city || "Unknown City"} ${geo?.zip ? `· Zip: ${geo.zip}` : ""}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeCity} ${safeZip ? `· Zip: ${safeZip}` : ""}</td>
           </tr>
-          ${geo?.lat && geo?.lon ? `
+          ${safeLat !== null && safeLon !== null ? `
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Coordinates:</strong></td>
-            <td style="padding: 5px 0;"><a href="${mapLink}" target="_blank" style="color: #38BDF8; text-decoration: underline;">${geo.lat}, ${geo.lon} (Open on Google Maps)</a></td>
+            <td style="padding: 5px 0;"><a href="${escapeHtml(mapLink)}" target="_blank" rel="noopener noreferrer" style="color: #38BDF8; text-decoration: underline;">${safeLat}, ${safeLon} (Open on Google Maps)</a></td>
           </tr>` : ""}
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>ISP / Carrier:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${geo?.isp || "Unknown Provider"}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeIsp}</td>
           </tr>
-          ${geo?.org || geo?.as ? `
+          ${safeOrg || safeAs ? `
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Organization / AS:</strong></td>
-            <td style="padding: 5px 0; color: #9CA3AF;">${geo?.org || ""} ${geo?.as ? `· ${geo.as}` : ""}</td>
+            <td style="padding: 5px 0; color: #9CA3AF;">${safeOrg} ${safeAs ? `· ${safeAs}` : ""}</td>
           </tr>` : ""}
         </table>
       </div>
@@ -1869,29 +1919,29 @@ Dispatched automatically from your M R S Portfolio Backend.
         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF; width: 140px;"><strong>Device Category:</strong></td>
-            <td style="padding: 5px 0; color: #10B981; font-weight: 700;">${parsed.deviceType}</td>
+            <td style="padding: 5px 0; color: #10B981; font-weight: 700;">${safeDeviceType}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Screen Resolution:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${t.screenResolution || "Not reported"} ${t.viewportSize ? `· Viewport: ${t.viewportSize}` : ""} ${t.devicePixelRatio ? `· ${t.devicePixelRatio}x Pixel Ratio` : ""}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeScreenRes} ${safeViewportSize ? `· Viewport: ${safeViewportSize}` : ""} ${safePixelRatio ? `· ${safePixelRatio}x Pixel Ratio` : ""}</td>
           </tr>
-          ${t.gpuRenderer ? `
+          ${safeGpuRenderer ? `
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>GPU Graphics:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${t.gpuRenderer} ${t.gpuVendor ? `<span style="color: #9CA3AF;">(${t.gpuVendor})</span>` : ""}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeGpuRenderer} ${safeGpuVendor ? `<span style="color: #9CA3AF;">(${safeGpuVendor})</span>` : ""}</td>
           </tr>` : ""}
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>CPU & RAM Specs:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${[t.cores, t.deviceMemory].filter(Boolean).join(" · ") || "Not reported by client"}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeCpuRam}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Input Capability:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${t.touchSupport || "Mouse / Keyboard"}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeTouchSupport}</td>
           </tr>
-          ${t.batteryLevel ? `
+          ${safeBatteryLevel ? `
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Battery State:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${t.batteryLevel} ${t.batteryCharging ? "⚡ Charging (AC Power)" : "🔋 Discharging"}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeBatteryLevel} ${t.batteryCharging ? "⚡ Charging (AC Power)" : "🔋 Discharging"}</td>
           </tr>` : ""}
         </table>
       </div>
@@ -1902,23 +1952,23 @@ Dispatched automatically from your M R S Portfolio Backend.
         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF; width: 140px;"><strong>Operating System:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6; font-weight: 600;">${parsed.os} ${t.platform ? `<span style="color: #9CA3AF;">(${t.platform})</span>` : ""}</td>
+            <td style="padding: 5px 0; color: #F3F4F6; font-weight: 600;">${safeOs} ${safePlatform ? `<span style="color: #9CA3AF;">(${safePlatform})</span>` : ""}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Web Browser:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6; font-weight: 600;">${parsed.browser}</td>
+            <td style="padding: 5px 0; color: #F3F4F6; font-weight: 600;">${safeBrowser}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Visitor Local Clock:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${localTimeStr} ${t.timezone ? `<span style="color: #E2B867;">(${t.timezone} ${t.timezoneOffset || ""})</span>` : ""}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeLocalTime} ${safeTimezone ? `<span style="color: #E2B867;">(${safeTimezone} ${safeTimezoneOffset})</span>` : ""}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Preferred Language:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6;">${t.languages || t.primaryLanguage || info.headers?.["accept-language"] || "Not reported"}</td>
+            <td style="padding: 5px 0; color: #F3F4F6;">${safeLang}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Environment Features:</strong></td>
-            <td style="padding: 5px 0; color: #9CA3AF;">${[t.colorSchemePreference, t.cookiesEnabled !== false ? "Cookies OK" : "Cookies Disabled", t.webAssemblySupported ? "Wasm OK" : "", t.pdfViewerEnabled ? "Native PDF" : ""].filter(Boolean).join(" · ")}</td>
+            <td style="padding: 5px 0; color: #9CA3AF;">${safeEnvFeatures}</td>
           </tr>
         </table>
       </div>
@@ -1929,20 +1979,20 @@ Dispatched automatically from your M R S Portfolio Backend.
         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF; width: 140px;"><strong>Site Session Time:</strong></td>
-            <td style="padding: 5px 0; color: #38BDF8; font-weight: 600;">${sessionDurationStr}</td>
+            <td style="padding: 5px 0; color: #38BDF8; font-weight: 600;">${safeSessionDuration}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Referrer Source:</strong></td>
-            <td style="padding: 5px 0; color: #F3F4F6; word-break: break-all;">${t.referrer || info.headers?.referer || "Direct Access / Bookmark"}</td>
+            <td style="padding: 5px 0; color: #F3F4F6; word-break: break-all;">${safeReferrer}</td>
           </tr>
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Page URL:</strong></td>
-            <td style="padding: 5px 0; color: #9CA3AF; word-break: break-all; font-family: monospace; font-size: 12px;">${t.url || info.headers?.referer || "Direct API Request"}</td>
+            <td style="padding: 5px 0; color: #9CA3AF; word-break: break-all; font-family: monospace; font-size: 12px;">${safePageUrl}</td>
           </tr>
-          ${t.utmSource || t.utmCampaign ? `
+          ${safeUtmSummary ? `
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>UTM Campaign:</strong></td>
-            <td style="padding: 5px 0; color: #E2B867;">${[t.utmSource ? `Source: ${t.utmSource}` : "", t.utmMedium ? `Medium: ${t.utmMedium}` : "", t.utmCampaign ? `Campaign: ${t.utmCampaign}` : ""].filter(Boolean).join(" | ")}</td>
+            <td style="padding: 5px 0; color: #E2B867;">${safeUtmSummary}</td>
           </tr>` : ""}
         </table>
       </div>
@@ -1950,7 +2000,7 @@ Dispatched automatically from your M R S Portfolio Backend.
       <!-- 5. Complete Raw User-Agent Header -->
       <div style="background: #1A2234; border-left: 4px solid #C5A059; border-radius: 6px; padding: 14px; margin-bottom: 20px; font-size: 12px;">
         <span style="color: #9CA3AF; display: block; margin-bottom: 4px; font-weight: 600;">Full Raw User-Agent Header:</span>
-        <code style="color: #CBD5E1; font-size: 11.5px; word-break: break-all; display: block; font-family: monospace;">${info.userAgent}</code>
+        <code style="color: #CBD5E1; font-size: 11.5px; word-break: break-all; display: block; font-family: monospace;">${safeUserAgent}</code>
       </div>
 
       <div style="text-align: center; border-top: 1px solid #1F2937; padding-top: 16px; font-size: 11.5px; color: #6B7280;">
@@ -1964,7 +2014,7 @@ Dispatched automatically from your M R S Portfolio Backend.
       const sent = await transporter.sendMail({
         from: `"MRS Portfolio Concierge" <${gmailUser}>`,
         to: destinationEmail,
-        subject: emailSubject,
+        subject: safeSubjectHeader,
         text: textContent,
         html: htmlContent,
         attachments: attachments.length > 0 ? attachments : undefined,
@@ -3186,21 +3236,29 @@ app.post("/api/tts", async (req, res) => {
 // Inquiries routing endpoint (Direct dispatch via Gmail SMTP - no persistent database storage)
 app.post("/api/inquiries", async (req, res) => {
   try {
-    const { name, email, note } = req.body;
-    if (!name || !note) {
-      return res.status(400).json({ error: "Name and message note are required." });
+    const { name, email, note } = req.body ?? {};
+    if (typeof name !== "string" || typeof note !== "string") {
+      return res.status(400).json({ error: "Name and message note must be valid text." });
+    }
+    if (email !== undefined && typeof email !== "string") {
+      return res.status(400).json({ error: "Email must be a valid text address." });
     }
 
-    const sanitizeInlineHeader = (val: string) => val.replace(/[\r\n]+/g, " ").trim();
-    const stripHtmlMarkup = (val: string) =>
-      val.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-
-    const senderName = stripHtmlMarkup(sanitizeInlineHeader(String(name))).slice(0, 100);
-    const rawEmail = sanitizeInlineHeader(email ? String(email) : "").slice(0, 128);
+    const senderName = stripHtmlTags(stripCrlf(name, 200)).slice(0, 100);
+    const rawEmail = stripCrlf(email || "", 128).replace(/\s+/g, "");
+    if (rawEmail && rawEmail !== "guest@portfolio.com" && rawEmail !== "visitor@mrs-concierge.internal" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+      return res.status(400).json({ error: "Please provide a valid reply-to email address." });
+    }
     const senderEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)
-      ? rawEmail
+      ? rawEmail.slice(0, 128)
       : "visitor@mrs-concierge.internal";
-    const senderNote = String(note).trim().slice(0, 2000);
+    const senderNote = note
+      .replace(/\r\n?/g, "\n")
+      .replace(/<[^>]*>/g, "")
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+      .trim()
+      .slice(0, 2000);
+
     if (!senderName || !senderNote) {
       return res.status(400).json({ error: "Valid name and message note are required." });
     }
@@ -3208,17 +3266,10 @@ app.post("/api/inquiries", async (req, res) => {
     const destinationEmail = process.env.GMAIL_RECIPIENT || process.env.GMAIL_USER || "mr216873@gmail.com";
     const gmailUser = process.env.GMAIL_USER || "mr216873@gmail.com";
 
-    const escapeHtml = (unsafe: string) =>
-      unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-
     const safeHtmlName = escapeHtml(senderName);
     const safeHtmlEmail = escapeHtml(senderEmail);
     const safeHtmlNote = escapeHtml(senderNote);
+    const encodedMailtoEmail = encodeURIComponent(senderEmail);
 
     const transporter = getSmtpTransporter();
     let smtpDelivered = false;
@@ -3231,7 +3282,7 @@ app.post("/api/inquiries", async (req, res) => {
           from: `"MRS Portfolio Concierge" <${gmailUser}>`,
           to: destinationEmail,
           replyTo: senderEmail,
-          subject: `[MRS Inquiry] Direct message from ${senderName}`,
+          subject: sanitizeEmailSubject(`[MRS Inquiry] Direct message from ${senderName}`, 160),
           text: `You received a new portfolio inquiry from ${senderName} (${senderEmail}):\n\n"${senderNote}"\n\nTimestamp: ${new Date().toUTCString()}\nSource: MRS Gravatar Portfolio & Concierge`,
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0B0F19; color: #E5E7EB; border: 1px solid #1F2937; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
@@ -3249,7 +3300,7 @@ app.post("/api/inquiries", async (req, res) => {
                   </tr>
                   <tr>
                     <td style="padding: 6px 0; color: #9CA3AF;"><strong>Email:</strong></td>
-                    <td style="padding: 6px 0; color: #1D8FF2;"><a href="mailto:${safeHtmlEmail}" style="color: #1D8FF2; text-decoration: none;">${safeHtmlEmail}</a></td>
+                    <td style="padding: 6px 0; color: #1D8FF2;"><a href="mailto:${encodedMailtoEmail}" style="color: #1D8FF2; text-decoration: none;">${safeHtmlEmail}</a></td>
                   </tr>
                   <tr>
                     <td style="padding: 6px 0; color: #9CA3AF;"><strong>Time (UTC):</strong></td>
@@ -3265,7 +3316,7 @@ app.post("/api/inquiries", async (req, res) => {
 
               <div style="text-align: center; border-top: 1px solid #1F2937; padding-top: 16px; margin-top: 24px; font-size: 12px; color: #6B7280;">
                 <p style="margin: 0 0 12px 0;">This email was dispatched autonomously by your MRS Gravatar Concierge.</p>
-                <a href="mailto:${safeHtmlEmail}?subject=Re:%20Portfolio%20Inquiry%20-%20MRS" style="display: inline-block; background: #1D8FF2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 18px; border-radius: 6px;">Reply Directly to ${safeHtmlName}</a>
+                <a href="mailto:${encodedMailtoEmail}?subject=Re:%20Portfolio%20Inquiry%20-%20MRS" style="display: inline-block; background: #1D8FF2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 18px; border-radius: 6px;">Reply Directly to ${safeHtmlName}</a>
               </div>
             </div>
           `,
@@ -3336,18 +3387,27 @@ app.post("/api/inquiries", async (req, res) => {
 // Register a new user account and store on server
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { email, password, displayName, receivePlatformUpdates = true, receiveBlogUpdates = true } = req.body;
-    if (!email || !String(email).includes("@")) {
+    const { email, password, displayName, receivePlatformUpdates = true, receiveBlogUpdates = true } = req.body ?? {};
+    if (typeof email !== "string") {
       return res.status(400).json({ error: "A valid email address is required to create an account." });
     }
-    if (!password || String(password).length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters." });
+    const cleanEmail = stripCrlf(email, 128).replace(/\s+/g, "").toLowerCase();
+    if (cleanEmail.length < 3 || cleanEmail.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: "A valid email address is required to create an account." });
+    }
+    if (typeof password !== "string" || password.length < 6 || password.length > 128) {
+      return res.status(400).json({ error: "Password must be between 6 and 128 characters." });
     }
 
+    const cleanDisplayName =
+      typeof displayName === "string"
+        ? stripHtmlTags(stripCrlf(displayName, 100)).slice(0, 100) || undefined
+        : undefined;
+
     const result = createAccount({
-      email: String(email).trim(),
-      password: String(password),
-      displayName: displayName ? String(displayName).trim() : undefined,
+      email: cleanEmail,
+      password,
+      displayName: cleanDisplayName,
       receivePlatformUpdates: Boolean(receivePlatformUpdates),
       receiveBlogUpdates: Boolean(receiveBlogUpdates),
     });
@@ -3376,7 +3436,7 @@ app.post("/api/auth/signup", async (req, res) => {
         await transporter.sendMail({
           from: `"Camellia (M R S Assistant)" <${gmailUser}>`,
           to: result.user.email,
-          subject: emailContent.subject,
+          subject: sanitizeEmailSubject(emailContent.subject),
           text: emailContent.text,
           html: emailContent.html,
         });
@@ -3401,12 +3461,16 @@ app.post("/api/auth/signup", async (req, res) => {
 // Authenticate user with server-stored account credentials
 app.post("/api/auth/signin", (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    const { email, password } = req.body ?? {};
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({ error: "Email and password are required." });
+    }
+    const cleanEmail = stripCrlf(email, 128).replace(/\s+/g, "").toLowerCase();
+    if (!cleanEmail || !password || password.length > 128) {
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    const result = authenticateAccount(String(email).trim(), String(password));
+    const result = authenticateAccount(cleanEmail, password);
     if (!result.success) {
       return res.status(401).json({ error: result.error });
     }
@@ -3425,13 +3489,17 @@ app.post("/api/auth/signin", (req, res) => {
 // Update user profile or update email preferences
 app.post("/api/auth/update-profile", (req, res) => {
   try {
-    const { uid, displayName, receivePlatformUpdates, receiveBlogUpdates } = req.body;
-    if (!uid) {
-      return res.status(400).json({ error: "User UID is required." });
+    const { uid, displayName, receivePlatformUpdates, receiveBlogUpdates } = req.body ?? {};
+    if (typeof uid !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(uid.trim())) {
+      return res.status(400).json({ error: "Valid user UID is required." });
     }
+    const cleanDisplayName =
+      typeof displayName === "string"
+        ? stripHtmlTags(stripCrlf(displayName, 100)).slice(0, 100)
+        : undefined;
 
-    const result = updateAccountProfile(String(uid), {
-      displayName,
+    const result = updateAccountProfile(uid.trim(), {
+      displayName: cleanDisplayName,
       receivePlatformUpdates: receivePlatformUpdates !== undefined ? Boolean(receivePlatformUpdates) : undefined,
       receiveBlogUpdates: receiveBlogUpdates !== undefined ? Boolean(receiveBlogUpdates) : undefined,
     });
@@ -3571,16 +3639,24 @@ function resolveSiteUrl(req: express.Request): string {
 // Subscribe to M R S platform & project email updates
 app.post("/api/subscribers", async (req, res) => {
   try {
-    const { email, name, uid, receivePlatformUpdates = true, receiveBlogUpdates = true } = req.body;
-    if (!email || !String(email).includes("@")) {
+    const { email, name, uid, receivePlatformUpdates = true, receiveBlogUpdates = true } = req.body ?? {};
+    if (typeof email !== "string") {
       return res.status(400).json({ error: "A valid email address is required to subscribe." });
     }
 
+    const cleanSubEmail = stripCrlf(email, 128).replace(/\s+/g, "").toLowerCase();
+    if (cleanSubEmail.length < 3 || cleanSubEmail.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanSubEmail)) {
+      return res.status(400).json({ error: "Please provide a valid email address format." });
+    }
+
+    const cleanSubName = typeof name === "string" ? stripHtmlTags(stripCrlf(name, 100)).slice(0, 100) : undefined;
+    const cleanSubUid = typeof uid === "string" && /^[a-zA-Z0-9_-]{1,128}$/.test(uid.trim()) ? uid.trim() : undefined;
+
     const siteUrl = resolveSiteUrl(req);
     const subscriber = upsertSubscriber({
-      email: String(email).trim(),
-      name: name ? String(name).trim() : undefined,
-      uid: uid ? String(uid).trim() : undefined,
+      email: cleanSubEmail,
+      name: cleanSubName || undefined,
+      uid: cleanSubUid,
       receivePlatformUpdates: Boolean(receivePlatformUpdates),
       receiveBlogUpdates: Boolean(receiveBlogUpdates),
     });
@@ -3595,7 +3671,7 @@ app.post("/api/subscribers", async (req, res) => {
         await transporter.sendMail({
           from: `"Camellia (M R S Assistant)" <${gmailUser}>`,
           to: subscriber.email,
-          subject: emailContent.subject,
+          subject: sanitizeEmailSubject(emailContent.subject),
           text: emailContent.text,
           html: emailContent.html,
         });
@@ -3639,11 +3715,15 @@ app.get("/api/subscribers/status", (req, res) => {
 // Unsubscribe
 app.post("/api/subscribers/unsubscribe", (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "Email is required to unsubscribe." });
+    const { email } = req.body ?? {};
+    if (typeof email !== "string") {
+      return res.status(400).json({ error: "A valid email is required to unsubscribe." });
     }
-    const removed = removeSubscriber(String(email));
+    const cleanEmail = stripCrlf(email, 128).replace(/\s+/g, "").toLowerCase();
+    if (cleanEmail.length < 3 || cleanEmail.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: "Please provide a valid email address." });
+    }
+    const removed = removeSubscriber(cleanEmail);
     res.json({ success: true, removed, message: "Unsubscribed successfully." });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to unsubscribe" });
@@ -3653,10 +3733,16 @@ app.post("/api/subscribers/unsubscribe", (req, res) => {
 // Send a sample test platform update email directly to a recipient to verify formatting
 app.post("/api/subscribers/test-email", async (req, res) => {
   try {
-    const { email, name } = req.body;
-    if (!email) {
+    const { email, name } = req.body ?? {};
+    if (typeof email !== "string") {
       return res.status(400).json({ error: "Email address is required." });
     }
+    const cleanTargetEmail = stripCrlf(email, 128).replace(/\s+/g, "").toLowerCase();
+    if (cleanTargetEmail.length < 3 || cleanTargetEmail.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanTargetEmail)) {
+      return res.status(400).json({ error: "Please provide a valid recipient email address." });
+    }
+    const cleanTargetName =
+      typeof name === "string" ? stripHtmlTags(stripCrlf(name, 100)).slice(0, 100) || undefined : undefined;
 
     const siteUrl = resolveSiteUrl(req);
     const transporter = getSmtpTransporter();
@@ -3671,7 +3757,7 @@ app.post("/api/subscribers/test-email", async (req, res) => {
       badge: "VERIFIED LIVE",
       tags: ["IT Support Professional", "Claude AI Voice Engine", "Gravatar V3 Real-time", "Cloud Infrastructure"],
       customNote: "This update showcases the verified features of M R S Portfolio Hub. As a valued subscriber, explore the platform directly with full open access.",
-      recipientName: name || undefined,
+      recipientName: cleanTargetName,
     };
 
     const emailContent = formatProjectUpdateEmail(sampleProject);
@@ -3679,8 +3765,8 @@ app.post("/api/subscribers/test-email", async (req, res) => {
     if (transporter) {
       await transporter.sendMail({
         from: `"Camellia (M R S Assistant)" <${gmailUser}>`,
-        to: String(email).trim(),
-        subject: `[Update Preview] ${emailContent.subject}`,
+        to: cleanTargetEmail,
+        subject: sanitizeEmailSubject(`[Update Preview] ${emailContent.subject}`),
         text: emailContent.text,
         html: emailContent.html,
       });
@@ -3688,7 +3774,7 @@ app.post("/api/subscribers/test-email", async (req, res) => {
         success: true,
         delivered: true,
         siteUrl,
-        message: `Customized Camellia (M R S Assistant) update email dispatched to ${email}!`,
+        message: `Customized Camellia (M R S Assistant) update email dispatched to ${cleanTargetEmail}!`,
       });
     }
 
@@ -3707,17 +3793,35 @@ app.post("/api/subscribers/test-email", async (req, res) => {
 // Broadcast a project launch announcement to all registered subscribers
 app.post("/api/subscribers/broadcast", async (req, res) => {
   try {
-    const payload = req.body.project || req.body;
-    const title = payload.title;
-    const category = payload.category;
-    const description = payload.description;
-    const badge = payload.badge;
-    const tags = payload.tags;
-    const customNote = payload.customNote || payload.speechNarrative;
-
-    if (!title) {
+    const payload = (req.body && typeof req.body === "object" ? req.body.project || req.body : {}) as Record<string, unknown>;
+    if (typeof payload.title !== "string" || !stripCrlf(payload.title, 200)) {
       return res.status(400).json({ error: "Project title is required for broadcast." });
     }
+    const cleanTitle = stripHtmlTags(stripCrlf(payload.title, 200)).slice(0, 200);
+    const cleanCategory =
+      typeof payload.category === "string"
+        ? stripHtmlTags(stripCrlf(payload.category, 100)).slice(0, 100) || "Featured Platform"
+        : "Featured Platform";
+    const cleanDescription =
+      typeof payload.description === "string"
+        ? stripHtmlTags(payload.description.replace(/\r\n?/g, "\n")).trim().slice(0, 2000) || "New project update from M R S."
+        : "New project update from M R S.";
+    const cleanBadge =
+      typeof payload.badge === "string"
+        ? stripHtmlTags(stripCrlf(payload.badge, 40)).slice(0, 40) || "NEW RELEASE"
+        : "NEW RELEASE";
+    const cleanTags = Array.isArray(payload.tags)
+      ? payload.tags
+          .filter((t): t is string => typeof t === "string")
+          .slice(0, 12)
+          .map((t) => stripHtmlTags(stripCrlf(t, 40)).slice(0, 40))
+          .filter(Boolean)
+      : [];
+    const rawNote = payload.customNote ?? payload.speechNarrative;
+    const cleanCustomNote =
+      typeof rawNote === "string"
+        ? stripHtmlTags(rawNote.replace(/\r\n?/g, "\n")).trim().slice(0, 2000) || undefined
+        : undefined;
 
     const siteUrl = resolveSiteUrl(req);
     const subscribers = getAllSubscribers().filter((s) => s.receivePlatformUpdates);
@@ -3738,20 +3842,20 @@ app.post("/api/subscribers/broadcast", async (req, res) => {
         try {
           // Strictly this site link only
           const emailContent = formatProjectUpdateEmail({
-            title,
-            category: category || "Featured Platform",
-            description: description || "New project update from M R S.",
+            title: cleanTitle,
+            category: cleanCategory,
+            description: cleanDescription,
             siteUrl,
-            badge: badge || "NEW RELEASE",
-            tags: tags || [],
-            customNote,
+            badge: cleanBadge,
+            tags: cleanTags,
+            customNote: cleanCustomNote,
             recipientName: subscriber.name,
           });
 
           await transporter.sendMail({
             from: `"Camellia (M R S Assistant)" <${gmailUser}>`,
             to: subscriber.email,
-            subject: emailContent.subject,
+            subject: sanitizeEmailSubject(emailContent.subject),
             text: emailContent.text,
             html: emailContent.html,
           });
@@ -3781,22 +3885,47 @@ app.post("/api/subscribers/broadcast", async (req, res) => {
 // Automatic new update publishing endpoint: automatically sends email to all subscribers on new update
 app.post("/api/updates/publish", async (req, res) => {
   try {
-    const { title, category, description, badge, tags, customNote } = req.body;
-    if (!title || !description) {
+    const { title, category, description, badge, tags, customNote } = req.body ?? {};
+    if (typeof title !== "string" || typeof description !== "string") {
+      return res.status(400).json({ error: "Title and description strings are required for update publication." });
+    }
+    const cleanTitle = stripHtmlTags(stripCrlf(title, 200)).slice(0, 200);
+    const cleanDescription = stripHtmlTags(description.replace(/\r\n?/g, "\n")).trim().slice(0, 2000);
+    if (!cleanTitle || !cleanDescription) {
       return res.status(400).json({ error: "Title and description are required for update publication." });
     }
+
+    const cleanCategory =
+      typeof category === "string"
+        ? stripHtmlTags(stripCrlf(category, 100)).slice(0, 100) || "Platform & IT Service Update"
+        : "Platform & IT Service Update";
+    const cleanBadge =
+      typeof badge === "string"
+        ? stripHtmlTags(stripCrlf(badge, 40)).slice(0, 40) || "NEW UPDATE"
+        : "NEW UPDATE";
+    const cleanTags = Array.isArray(tags)
+      ? tags
+          .filter((t): t is string => typeof t === "string")
+          .slice(0, 12)
+          .map((t) => stripHtmlTags(stripCrlf(t, 40)).slice(0, 40))
+          .filter(Boolean)
+      : ["IT Support", "Platform Update", "M R S Portfolio"];
+    const cleanCustomNote =
+      typeof customNote === "string"
+        ? stripHtmlTags(customNote.replace(/\r\n?/g, "\n")).trim().slice(0, 2000) || undefined
+        : undefined;
 
     const siteUrl = resolveSiteUrl(req);
     const transporter = getSmtpTransporter();
 
     const result = await dispatchUpdateNotificationToSubscribers(
       {
-        title: String(title).trim(),
-        category: category ? String(category).trim() : "Platform & IT Service Update",
-        description: String(description).trim(),
-        badge: badge ? String(badge).trim() : "NEW UPDATE",
-        tags: Array.isArray(tags) ? tags : ["IT Support", "Platform Update", "M R S Portfolio"],
-        customNote: customNote ? String(customNote).trim() : undefined,
+        title: cleanTitle,
+        category: cleanCategory,
+        description: cleanDescription,
+        badge: cleanBadge,
+        tags: cleanTags,
+        customNote: cleanCustomNote,
         siteUrl,
       },
       transporter
@@ -4660,6 +4789,53 @@ async function startServer() {
 
   const server = http.createServer(app);
 
+  const resolveRequestOrigin = (req: express.Request): string => {
+    if (process.env.APP_URL) {
+      return cleanSiteUrl(process.env.APP_URL);
+    }
+    const rawProto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim().toLowerCase();
+    const proto = rawProto === "http" ? "http" : "https";
+    const rawHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+    if (/^[a-zA-Z0-9.-]+(?::[0-9]{1,5})?$/.test(rawHost)) {
+      return safeEmailHref(`${proto}://${rawHost}`);
+    }
+    return cleanSiteUrl();
+  };
+
+  const injectCanonicalSeoHtml = (rawHtml: string, req: express.Request): string => {
+    const baseOrigin = resolveRequestOrigin(req);
+    const reqPath = req.path && req.path !== "/" ? req.path.replace(/\/+$/, "") : "/";
+    const canonicalUrl = escapeHtml(`${baseOrigin}${reqPath === "/" ? "/" : reqPath}`);
+    const imageAbsUrl = escapeHtml(`${baseOrigin}/mrs_profile_avatar.jpg`);
+    const websiteJsonUrl = `${baseOrigin}/`.replace(/"/g, '\\"');
+
+    return rawHtml
+      .replace(
+        /<link id="canonical-link" rel="canonical" href="[^"]*"\s*\/?>/i,
+        `<link id="canonical-link" rel="canonical" href="${canonicalUrl}" />`
+      )
+      .replace(
+        /<meta id="og-url-meta" property="og:url" content="[^"]*"\s*\/?>/i,
+        `<meta id="og-url-meta" property="og:url" content="${canonicalUrl}" />`
+      )
+      .replace(
+        /<meta id="og-image-meta" property="og:image" content="[^"]*"\s*\/?>/i,
+        `<meta id="og-image-meta" property="og:image" content="${imageAbsUrl}" />`
+      )
+      .replace(
+        /<meta id="twitter-url-meta" name="twitter:url" content="[^"]*"\s*\/?>/i,
+        `<meta id="twitter-url-meta" name="twitter:url" content="${canonicalUrl}" />`
+      )
+      .replace(
+        /<meta id="twitter-image-meta" name="twitter:image" content="[^"]*"\s*\/?>/i,
+        `<meta id="twitter-image-meta" name="twitter:image" content="${imageAbsUrl}" />`
+      )
+      .replace(
+        /"url":\s*"https:\/\/ais-pre-kvr65sziiqaqoqlwvajinm-369506879239\.asia-southeast1\.run\.app\/"/g,
+        `"url": "${websiteJsonUrl}"`
+      );
+  };
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: {
@@ -4669,12 +4845,41 @@ async function startServer() {
       },
       appType: "spa",
     });
+    app.get("*", async (req, res, next) => {
+      const accept = String(req.headers.accept || "");
+      const isHtmlNav =
+        req.path === "/" ||
+        (!req.path.startsWith("/api") &&
+          !path.extname(req.path) &&
+          !req.path.startsWith("/@") &&
+          !req.path.startsWith("/src") &&
+          !req.path.startsWith("/node_modules") &&
+          accept.includes("text/html"));
+      if (!isHtmlNav) {
+        return next();
+      }
+      try {
+        const indexPath = path.resolve(process.cwd(), "index.html");
+        const template = fs.readFileSync(indexPath, "utf-8");
+        const transformed = await vite.transformIndexHtml(req.originalUrl, template);
+        const seoHtml = injectCanonicalSeoHtml(transformed, req);
+        res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(seoHtml);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      try {
+        const html = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+        res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(injectCanonicalSeoHtml(html, req));
+      } catch {
+        res.sendFile(path.join(distPath, "index.html"));
+      }
     });
   }
 

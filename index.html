@@ -27,65 +27,102 @@
     </script>
     <title>M R S Portfolio &ndash; IT Support &amp; Web Concierge</title>
     <meta name="description" content="Explore M R S's remote IT support, web management projects, technical writing, and interactive voice concierge. Request support or download the CV." />
+    <meta name="keywords" content="M R S, IT Support Professional, Web Manager, Remote System Administration, Microsoft 365, Digital Concierge, Technical Writer, Portfolio" />
     <meta name="author" content="M R S" />
-    <meta name="robots" content="index, follow" />
-    <link id="canonical-link" rel="canonical" href="/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <link id="canonical-link" rel="canonical" href="https://ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app/" />
     <link rel="icon" type="image/svg+xml" href="/site.svg" />
     <link rel="alternate icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="alternate" type="application/rss+xml" title="M R S Platform Updates" href="/rss.xml" />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="M R S Portfolio &amp; Concierge" />
-    <meta id="og-url-meta" property="og:url" content="/" />
+    <meta id="og-url-meta" property="og:url" content="https://ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app/" />
     <meta property="og:title" content="M R S Portfolio &ndash; IT Support &amp; Web Concierge" />
     <meta property="og:description" content="Explore M R S's remote IT support, web management projects, technical writing, and interactive voice concierge. Request support or download the CV." />
-    <meta property="og:image" content="/mrs_profile_avatar.jpg" />
+    <meta id="og-image-meta" property="og:image" content="/mrs_profile_avatar.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:alt" content="M R S Portfolio &amp; Concierge — IT Support Professional and Web Manager" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:creator" content="@Mrshahinx" />
+    <meta id="twitter-url-meta" name="twitter:url" content="https://ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app/" />
     <meta name="twitter:title" content="M R S Portfolio &ndash; IT Support &amp; Web Concierge" />
     <meta name="twitter:description" content="Explore M R S's remote IT support, web management projects, technical writing, and interactive voice concierge. Request support or download the CV." />
-    <meta name="twitter:image" content="/mrs_profile_avatar.jpg" />
+    <meta id="twitter-image-meta" name="twitter:image" content="/mrs_profile_avatar.jpg" />
+    <meta name="twitter:image:alt" content="M R S Portfolio &amp; Concierge" />
     <script>
       (function () {
         try {
-          var currentUrl = window.location.origin + window.location.pathname;
+          var cleanPath = window.location.pathname && window.location.pathname !== '/' ? window.location.pathname.replace(/\/+$/, '') : '/';
+          var currentUrl = window.location.origin + cleanPath;
           var canonical = document.getElementById('canonical-link');
           if (canonical) canonical.setAttribute('href', currentUrl);
           var ogUrl = document.getElementById('og-url-meta');
           if (ogUrl) ogUrl.setAttribute('content', currentUrl);
+          var twitterUrl = document.getElementById('twitter-url-meta');
+          if (twitterUrl) twitterUrl.setAttribute('content', currentUrl);
+          var ogImg = document.getElementById('og-image-meta');
+          if (ogImg && ogImg.getAttribute('content') && ogImg.getAttribute('content').startsWith('/')) {
+            ogImg.setAttribute('content', window.location.origin + ogImg.getAttribute('content'));
+          }
+          var twImg = document.getElementById('twitter-image-meta');
+          if (twImg && twImg.getAttribute('content') && twImg.getAttribute('content').startsWith('/')) {
+            twImg.setAttribute('content', window.location.origin + twImg.getAttribute('content'));
+          }
         } catch (e) {}
       })();
     </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "Person",
-      "name": "M R S",
-      "alternateName": "Mrshahinx",
-      "jobTitle": "IT Support Professional & Web Manager",
-      "description": "Explore M R S's remote IT support, web management projects, technical writing, and interactive voice concierge. Request support or download the CV.",
-      "email": "mr216873@gmail.com",
-      "telephone": "+8809611056361",
-      "url": "https://gravatar.com/mrxshahin",
-      "image": "/mrs_profile_avatar.jpg",
-      "sameAs": [
-        "https://gravatar.com/mrxshahin",
-        "https://www.linkedin.com/in/mrmahbubur",
-        "https://x.com/Mrshahinx",
-        "https://github.com/mrmahbubur",
-        "https://mrxshahin.wordpress.com",
-        "https://mrxshahin.blogspot.com/",
-        "https://mrmahbubur.github.io/Admin/",
-        "https://mrxshahin.ai.studio/",
-        "https://bsky.app/profile/mrxshahin.bsky.social"
-      ],
-      "knowsAbout": [
-        "Information Technology Support",
-        "Remote System Administration",
-        "Microsoft 365 & Office Workflows",
-        "Document Management",
-        "Web Management & Full-Stack Systems",
-        "Troubleshooting"
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "#website",
+          "name": "M R S Portfolio & Concierge",
+          "url": "https://ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app/",
+          "description": "Explore M R S's remote IT support, web management projects, technical writing, and interactive voice concierge. Request support or download the CV.",
+          "inLanguage": "en-US"
+        },
+        {
+          "@type": "ProfilePage",
+          "@id": "#profilepage",
+          "name": "M R S Portfolio & Concierge",
+          "isPartOf": { "@id": "#website" },
+          "mainEntity": { "@id": "#person" }
+        },
+        {
+          "@type": "Person",
+          "@id": "#person",
+          "name": "M R S",
+          "alternateName": "Mrshahinx",
+          "jobTitle": "IT Support Professional & Web Manager",
+          "description": "Explore M R S's remote IT support, web management projects, technical writing, and interactive voice concierge. Request support or download the CV.",
+          "email": "mr216873@gmail.com",
+          "telephone": "+8809611056361",
+          "url": "https://gravatar.com/mrxshahin",
+          "image": "/mrs_profile_avatar.jpg",
+          "sameAs": [
+            "https://gravatar.com/mrxshahin",
+            "https://www.linkedin.com/in/mrmahbubur",
+            "https://x.com/Mrshahinx",
+            "https://github.com/mrmahbubur",
+            "https://mrxshahin.wordpress.com",
+            "https://mrxshahin.blogspot.com/",
+            "https://mrmahbubur.github.io/Admin/",
+            "https://mrxshahin.ai.studio/",
+            "https://bsky.app/profile/mrxshahin.bsky.social"
+          ],
+          "knowsAbout": [
+            "Information Technology Support",
+            "Remote System Administration",
+            "Microsoft 365 & Office Workflows",
+            "Document Management",
+            "Web Management & Full-Stack Systems",
+            "Troubleshooting"
+          ]
+        }
       ]
     }
     </script>

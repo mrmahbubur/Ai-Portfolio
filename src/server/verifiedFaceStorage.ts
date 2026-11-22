@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import { escapeHtml, sanitizeEmailSubject } from './emailSanitizer.ts';
 
 export interface VerifiedFaceRecord {
   id: string;
@@ -149,8 +150,22 @@ async function sendVerificationNotificationEmail(
       tls: { rejectUnauthorized: false },
     });
 
-    const cid = `captured_face_${record.id}`;
-    const subject = `[Person Verified] Face Photo Captured & Stored (${record.country || 'Visitor'} · ID: ${record.id})`;
+    const cid = `captured_face_${record.id.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    const subject = sanitizeEmailSubject(
+      `[Person Verified] Face Photo Captured & Stored (${record.country || 'Visitor'} · ID: ${record.id})`
+    );
+
+    const safeId = escapeHtml(record.id);
+    const safeMethod = escapeHtml(record.verificationMethod);
+    const safeConfidence = escapeHtml(record.confidence);
+    const safeFileName = escapeHtml(record.fileName);
+    const safeTimestamp = escapeHtml(new Date(record.timestamp).toUTCString());
+    const safeIp = escapeHtml(record.ip);
+    const safeCountry = escapeHtml(record.country);
+    const safeCity = record.city ? escapeHtml(record.city) : '';
+    const safeIsp = geo?.isp ? escapeHtml(geo.isp) : '';
+    const safeDevice = escapeHtml(record.deviceType);
+    const safeUa = escapeHtml(record.userAgent);
 
     const htmlBody = `
 <!DOCTYPE html>
@@ -173,7 +188,7 @@ async function sendVerificationNotificationEmail(
         Verified Person Photo Captured &amp; Stored
       </h2>
       <p style="margin:0;color:#94A3B8;font-size:13px;">
-        Tracking ID: <strong style="color:#60A5FA;font-family:monospace;">${record.id}</strong> &bull; Method: <strong style="color:#E2B867;">${record.verificationMethod}</strong>
+        Tracking ID: <strong style="color:#60A5FA;font-family:monospace;">${safeId}</strong> &bull; Method: <strong style="color:#E2B867;">${safeMethod}</strong>
       </p>
     </div>
 
@@ -183,7 +198,7 @@ async function sendVerificationNotificationEmail(
         <img src="cid:${cid}" alt="Verified Person Face" style="max-width:340px;width:100%;height:auto;border-radius:10px;display:block;" />
       </div>
       <div style="margin-top:12px;font-size:12px;color:#94A3B8;">
-        Confidence Score: <strong style="color:#10B981;">${record.confidence}%</strong> &bull; Stored File: <span style="font-family:monospace;color:#CBD5E1;">${record.fileName}</span>
+        Confidence Score: <strong style="color:#10B981;">${safeConfidence}%</strong> &bull; Stored File: <span style="font-family:monospace;color:#CBD5E1;">${safeFileName}</span>
       </div>
     </div>
 
@@ -196,28 +211,28 @@ async function sendVerificationNotificationEmail(
         <tbody>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
             <td style="padding:7px 0;color:#94A3B8;width:140px;">Timestamp:</td>
-            <td style="padding:7px 0;color:#F8FAFC;font-family:monospace;">${new Date(record.timestamp).toUTCString()}</td>
+            <td style="padding:7px 0;color:#F8FAFC;font-family:monospace;">${safeTimestamp}</td>
           </tr>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
             <td style="padding:7px 0;color:#94A3B8;">IP Address:</td>
-            <td style="padding:7px 0;color:#60A5FA;font-family:monospace;font-weight:600;">${record.ip}</td>
+            <td style="padding:7px 0;color:#60A5FA;font-family:monospace;font-weight:600;">${safeIp}</td>
           </tr>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
             <td style="padding:7px 0;color:#94A3B8;">Location:</td>
-            <td style="padding:7px 0;color:#F8FAFC;"><strong>${record.country}</strong> ${record.city ? `(${record.city})` : ''}</td>
+            <td style="padding:7px 0;color:#F8FAFC;"><strong>${safeCountry}</strong> ${safeCity ? `(${safeCity})` : ''}</td>
           </tr>
-          ${geo?.isp ? `
+          ${safeIsp ? `
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
             <td style="padding:7px 0;color:#94A3B8;">ISP / Network:</td>
-            <td style="padding:7px 0;color:#CBD5E1;">${geo.isp}</td>
+            <td style="padding:7px 0;color:#CBD5E1;">${safeIsp}</td>
           </tr>` : ''}
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
             <td style="padding:7px 0;color:#94A3B8;">Device Type:</td>
-            <td style="padding:7px 0;color:#10B981;font-weight:600;">${record.deviceType}</td>
+            <td style="padding:7px 0;color:#10B981;font-weight:600;">${safeDevice}</td>
           </tr>
           <tr>
             <td style="padding:7px 0;color:#94A3B8;">User Agent:</td>
-            <td style="padding:7px 0;color:#94A3B8;font-size:11px;font-family:monospace;word-break:break-all;">${record.userAgent}</td>
+            <td style="padding:7px 0;color:#94A3B8;font-size:11px;font-family:monospace;word-break:break-all;">${safeUa}</td>
           </tr>
         </tbody>
       </table>
@@ -225,7 +240,7 @@ async function sendVerificationNotificationEmail(
 
     <!-- Footer -->
     <div style="padding:16px 28px;background-color:#0B0F19;border-top:1px solid rgba(255,255,255,0.08);font-size:11.5px;color:#64748B;">
-      Captured autonomously according to M R S Verification Governance. Stored securely on backend storage at <code>data/verified_faces/${record.fileName}</code>.
+      Captured autonomously according to M R S Verification Governance. Stored securely on backend storage at <code>data/verified_faces/${safeFileName}</code>.
     </div>
   </div>
 </body>

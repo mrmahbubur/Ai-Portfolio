@@ -293,23 +293,40 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(user);
-        try {
-          localStorage.setItem(
-            'mrs_auth_user',
-            JSON.stringify({
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
-              emailVerified: user.emailVerified,
-            })
-          );
-        } catch (e) {}
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        if (user) {
+          setCurrentUser(user);
+          try {
+            localStorage.setItem(
+              'mrs_auth_user',
+              JSON.stringify({
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                emailVerified: user.emailVerified,
+              })
+            );
+          } catch {}
+        } else {
+          try {
+            const raw = localStorage.getItem('mrs_auth_user');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (!parsed?.isServerAccount) {
+                localStorage.removeItem('mrs_auth_user');
+                setCurrentUser(null);
+              }
+            }
+          } catch {}
+        }
+      },
+      (authErr) => {
+        console.warn('Firebase authentication listener error:', authErr);
       }
-    });
+    );
     return () => unsubscribe();
   }, []);
 

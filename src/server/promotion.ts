@@ -1,4 +1,5 @@
 import { getAllSubscribers, cleanSiteUrl, FEATURED_PLATFORM_URL } from './subscribers';
+import { escapeHtml, safeEmailHref } from './emailSanitizer.ts';
 
 export interface SocialSharePack {
   platform: 'linkedin' | 'x' | 'whatsapp' | 'telegram' | 'facebook' | 'reddit' | 'email';
@@ -184,7 +185,7 @@ export function generateRssFeed(siteUrl?: string): string {
 
 // Generate valid Sitemap XML for Google, Bing, and Search Engine Bots
 export function generateSitemapXml(siteUrl?: string): string {
-  const targetUrl = cleanSiteUrl(siteUrl);
+  const targetUrl = escapeHtml(cleanSiteUrl(siteUrl));
   const today = new Date().toISOString().split('T')[0];
 
   const pages = [
@@ -223,8 +224,10 @@ Sitemap: ${targetUrl}/rss.xml
 
 // Generate comprehensive promotional digest email for all subscribers
 export function generatePromotionalDigestEmail(siteUrl?: string): { subject: string; text: string; html: string } {
-  const targetUrl = cleanSiteUrl(siteUrl);
-  const hubUrl = FEATURED_PLATFORM_URL;
+  const targetUrl = safeEmailHref(cleanSiteUrl(siteUrl));
+  const hubUrl = safeEmailHref(FEATURED_PLATFORM_URL);
+  const safeTargetUrl = escapeHtml(targetUrl);
+  const safeHubUrl = escapeHtml(hubUrl);
   const subject = `⭐ Platform Showcase: M R S Verified IT Support & Digital Ecosystem`;
 
   const text = 
@@ -273,7 +276,7 @@ Personal Concierge for M R S (Certified IT Support Professional)`;
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${subject}</title>
+      <title>${escapeHtml(subject)}</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #0B0F19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #F8FAFC;">
       <div style="max-width: 600px; margin: 24px auto; background: #131B2E; border: 1px solid rgba(226, 184, 103, 0.35); border-radius: 16px; overflow: hidden;">
@@ -311,14 +314,14 @@ Personal Concierge for M R S (Certified IT Support Professional)`;
           </div>
 
           <div style="text-align: center; margin-top: 24px;">
-            <a href="${targetUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: linear-gradient(135deg, #E2B867 0%, #D4A045 100%); color: #0B0F19; font-weight: 800; font-size: 13px; font-family: ui-monospace, monospace; text-transform: uppercase; padding: 12px 28px; border-radius: 8px; text-decoration: none;">
+            <a href="${safeTargetUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: linear-gradient(135deg, #E2B867 0%, #D4A045 100%); color: #0B0F19; font-weight: 800; font-size: 13px; font-family: ui-monospace, monospace; text-transform: uppercase; padding: 12px 28px; border-radius: 8px; text-decoration: none;">
               Launch Interactive Portfolio ↗
             </a>
           </div>
         </div>
 
         <div style="background: #0B0F19; border-top: 1px solid #1E293B; padding: 16px 30px; text-align: center; font-size: 11px; color: #64748B;">
-          Direct Email: <a href="mailto:mr216873@gmail.com" style="color: #E2B867; text-decoration: none;">mr216873@gmail.com</a> • Hub: <a href="${hubUrl}" style="color: #94A3B8; text-decoration: none;">${hubUrl}</a>
+          Direct Email: <a href="mailto:mr216873@gmail.com" style="color: #E2B867; text-decoration: none;">mr216873@gmail.com</a> • Hub: <a href="${safeHubUrl}" style="color: #94A3B8; text-decoration: none;">${safeHubUrl}</a>
         </div>
       </div>
     </body>

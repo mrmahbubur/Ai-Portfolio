@@ -38,6 +38,13 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, googleAuthProvider, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { formatFirebaseAuthError } from '../lib/firebaseAuthErrors';
+import {
+  INPUT_LIMITS,
+  isValidEmailAddress,
+  sanitizeEmailInput,
+  sanitizeSingleLineText,
+} from '../utils/inputSanitization';
 import { EmailUpdatePreview } from './EmailUpdatePreview';
 
 interface AuthModalProps {
@@ -182,8 +189,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const syncUserToFirestore = async (user: User, name?: string) => {
     const userPath = `users/${user.uid}`;
     const userRef = doc(db, 'users', user.uid);
-    const cleanName = (name || user.displayName || 'Subscriber').trim().slice(0, 100);
-    const cleanEmail = (user.email || '').trim().slice(0, 128);
+    const cleanName = sanitizeSingleLineText(name || user.displayName || 'Subscriber', INPUT_LIMITS.NAME_MAX) || 'Subscriber';
+    const cleanEmail = sanitizeEmailInput(user.email || '', INPUT_LIMITS.EMAIL_MAX);
     const nowIso = new Date().toISOString();
 
     try {
@@ -282,7 +289,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMsg(null);
     setIsLoading(true);
 
-    const cleanEmail = email.trim();
+    const cleanEmail = sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
+    if (!isValidEmailAddress(cleanEmail)) {
+      setErrorMsg('Please enter a valid email address format.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       // 1. Authenticate with server-stored account
@@ -295,7 +307,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }),
       });
 
-      const signinData = await signinRes.json();
+      const signinData = await signinRes.json().catch(() => ({}));
 
       if (signinRes.ok && signinData.success && signinData.user) {
         const serverUser = signinData.user;
@@ -312,12 +324,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         try {
           localStorage.setItem('mrs_auth_user', JSON.stringify(activeUser));
-        } catch (storageErr) {}
+        } catch {}
 
         // Non-fatal parallel sign-in with Firebase if available
         try {
           await signInWithEmailAndPassword(auth, cleanEmail, password);
-        } catch (fbErr) {}
+        } catch (fbSyncErr) {
+          console.debug('Parallel Firebase auth sync notice:', formatFirebaseAuthError(fbSyncErr));
+        }
 
         onUserChanged?.(activeUser as any);
         setSuccessMsg('Signed in successfully! Your subscriber preferences are active.');
@@ -340,7 +354,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         };
         try {
           localStorage.setItem('mrs_auth_user', JSON.stringify(fbUser));
-        } catch (storageErr) {}
+        } catch {}
 
         onUserChanged?.(cred.user);
         await syncUserToFirestore(cred.user);
@@ -357,11 +371,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }, 1200);
         return;
       } catch (fbErr: any) {
-        throw new Error(signinData.error || 'Invalid email or password. If you have not created an account yet, switch to Sign Up.');
+        const fbCode = String(fbErr?.code || '').toLowerCase();
+        const friendlyFbError =
+          fbCode === 'auth/too-many-requests' ||
+          fbCode === 'auth/network-request-failed' ||
+          fbCode === 'auth/user-disabled' ||
+          fbCode === 'auth/operation-not-allowed'
+            ? formatFirebaseAuthError(fbErr)
+            : signinData?.error || formatFirebaseAuthError(fbErr);
+        throw new Error(friendlyFbError);
       }
     } catch (err: any) {
       console.error('Sign in error:', err);
-      setErrorMsg(err.message || 'Unable to sign in. Please verify your email and password.');
+      setErrorMsg(formatFirebaseAuthError(err, 'Unable to sign in. Please verify your email and password.'));
     } finally {
       setIsLoading(false);
     }
@@ -374,15 +396,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMsg(null);
     setSignupVerificationNotice(null);
 
-    const cleanEmail = email.trim();
+    const cleanEmail = sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
+    const sanitizedName = sanitizeSingleLineText(displayName, INPUT_LIMITS.NAME_MAX);
 
-    if (!cleanEmail || !cleanEmail.includes('@')) {
+    if (!isValidEmailAddress(cleanEmail)) {
       setErrorMsg('Please enter a valid email address format.');
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMsg('Password must be at least 6 characters.');
+    if (password.length < INPUT_LIMITS.PASSWORD_MIN) {
+      setErrorMsg(`Password must be at least ${INPUT_LIMITS.PASSWORD_MIN} characters.`);
       return;
     }
 
@@ -401,7 +424,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       try {
         const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         firebaseUser = cred.user;
-        const name = displayName.trim();
+        const name = sanitizedName;
         if (name) {
           try {
             await updateProfile(cred.user, { displayName: name });
@@ -511,15 +534,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (err: any) {
       console.error('Sign up error:', err);
-      let message = err.message || 'Failed to create account. Please verify your information.';
-      if (err.code === 'auth/email-already-in-use') {
-        message = 'An account with this email already exists. Switch to Sign In or reset your password.';
-      } else if (err.code === 'auth/invalid-email') {
-        message = 'Please enter a valid email address format.';
-      } else if (err.code === 'auth/weak-password') {
-        message = 'The password is too weak. Please use at least 6 characters.';
-      }
-      setErrorMsg(message);
+      setErrorMsg(formatFirebaseAuthError(err, 'Failed to create account. Please verify your information.'));
     } finally {
       setIsLoading(false);
     }
@@ -547,13 +562,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }, 1200);
     } catch (err: any) {
       console.error('Google sign in error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMsg('Google sign-in popup was closed before finishing.');
-      } else if (err.code === 'auth/popup-blocked') {
-        setErrorMsg('The sign-in popup was blocked by your browser. Please allow popups for this site.');
-      } else {
-        setErrorMsg('Google authentication was interrupted. You can also sign in with email and password.');
-      }
+      setErrorMsg(
+        formatFirebaseAuthError(
+          err,
+          'Google authentication could not be completed. You can also sign in with email and password.'
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -562,7 +576,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // 4. Password Reset
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) {
+    const cleanResetEmail = sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
+    if (!isValidEmailAddress(cleanResetEmail)) {
       setErrorMsg('Please enter a valid email address to receive the password recovery link.');
       return;
     }
@@ -570,16 +585,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      await sendPasswordResetEmail(auth, email.trim());
-      setSuccessMsg(`Password reset link dispatched to ${email.trim()}! Please check your inbox.`);
+      await sendPasswordResetEmail(auth, cleanResetEmail);
+      setSuccessMsg(`Password reset link dispatched to ${cleanResetEmail}! Please check your inbox.`);
       onAnnounce?.('Password reset email dispatched. Please check your inbox.');
     } catch (err: any) {
       console.error('Password reset error:', err);
-      let msg = 'Could not dispatch reset email. Please ensure the email is registered.';
-      if (err.code === 'auth/user-not-found') {
-        msg = 'No account found with this email address.';
-      }
-      setErrorMsg(msg);
+      setErrorMsg(
+        formatFirebaseAuthError(err, 'Could not dispatch reset email. Please ensure the email is registered.')
+      );
     } finally {
       setIsLoading(false);
     }
@@ -592,6 +605,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMsg('No active user session found. Please sign in first.');
       return;
     }
+    if (!auth.currentUser && typeof targetUser.sendEmailVerification !== 'function') {
+      setErrorMsg('Email verification links are dispatched for Firebase-linked accounts. Please sign in again if needed.');
+      return;
+    }
     setIsSendingVerification(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -602,15 +619,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         await targetUser.sendEmailVerification();
       }
       setVerificationSent(true);
-      const targetEmail = targetUser.email || email.trim();
+      const targetEmail = targetUser.email || sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
       setSuccessMsg(`Verification email dispatched to ${targetEmail}! Check your inbox and spam folder.`);
       onAnnounce?.('Firebase verification email sent to your inbox.');
     } catch (err: any) {
-      if (err.code === 'auth/too-many-requests') {
-        setErrorMsg('Too many verification requests. Please wait a few minutes.');
-      } else {
-        setErrorMsg('Could not send verification email at this moment.');
-      }
+      setErrorMsg(formatFirebaseAuthError(err, 'Could not send verification email at this moment.'));
     } finally {
       setIsSendingVerification(false);
     }
@@ -619,7 +632,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // 6. Update Display Name for Signed-In User
   const handleUpdateDisplayName = async () => {
     if (!currentUser) return;
-    const cleanName = displayName.trim();
+    const cleanName = sanitizeSingleLineText(displayName, INPUT_LIMITS.NAME_MAX);
     if (!cleanName) {
       setErrorMsg('Display name cannot be blank.');
       return;
@@ -710,16 +723,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMsg(null);
     try {
       // 1. Sync with server profile & subscriber cache
-      await fetch('/api/auth/update-profile', {
+      const updateRes = await fetch('/api/auth/update-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid: currentUser.uid,
-          displayName: currentUser.displayName,
+          displayName: sanitizeSingleLineText(currentUser.displayName || '', INPUT_LIMITS.NAME_MAX) || undefined,
           receivePlatformUpdates,
           receiveBlogUpdates,
         }),
       });
+      if (!updateRes.ok && !auth.currentUser) {
+        const errPayload = await updateRes.json().catch(() => ({}));
+        throw new Error(errPayload.error || 'Could not update server preferences.');
+      }
 
       // 2. Update Firestore users & subscribers documents when signed into Firebase
       if (auth.currentUser && auth.currentUser.uid === currentUser.uid) {
@@ -797,13 +814,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // 8. Sign Out (Clears both Firebase & server session)
   const handleSignOut = async () => {
+    setErrorMsg(null);
     try {
       try {
         localStorage.removeItem('mrs_auth_user');
-      } catch (e) {}
-      try {
+      } catch {}
+      if (auth.currentUser) {
         await signOut(auth);
-      } catch (e) {}
+      }
       onUserChanged?.(null);
       setSuccessMsg('Signed out successfully.');
       onAnnounce?.('You have signed out successfully.');
@@ -812,6 +830,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }, 900);
     } catch (err) {
       console.error('Sign out error:', err);
+      setErrorMsg(formatFirebaseAuthError(err, 'Failed to sign out completely. Please refresh and try again.'));
     }
   };
 
@@ -1079,8 +1098,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <UserIcon className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
                     <input
                       type="text"
+                      maxLength={INPUT_LIMITS.NAME_MAX}
                       value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
+                      onChange={(e) => setDisplayName(e.target.value.slice(0, INPUT_LIMITS.NAME_MAX))}
                       placeholder="Your preferred name"
                       className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--bg)] text-xs font-mono text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--gold)] transition-colors"
                     />
@@ -1207,8 +1227,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     type="email"
                     required
+                    maxLength={INPUT_LIMITS.EMAIL_MAX}
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value.slice(0, INPUT_LIMITS.EMAIL_MAX))}
                     placeholder="yourname@example.com"
                     className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--bg)] text-xs sm:text-sm font-mono text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--gold)] transition-colors"
                   />
@@ -1304,8 +1325,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <UserIcon className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
                       <input
                         type="text"
+                        maxLength={INPUT_LIMITS.NAME_MAX}
                         value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
+                        onChange={(e) => setDisplayName(e.target.value.slice(0, INPUT_LIMITS.NAME_MAX))}
                         placeholder="e.g. Alexander Clark"
                         className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--bg)] text-xs sm:text-sm font-mono text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--gold)] transition-colors"
                       />
@@ -1321,8 +1343,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input
                         type="email"
                         required
+                        maxLength={INPUT_LIMITS.EMAIL_MAX}
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => setEmail(e.target.value.slice(0, INPUT_LIMITS.EMAIL_MAX))}
                         placeholder="yourname@example.com"
                         className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--bg)] text-xs sm:text-sm font-mono text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--gold)] transition-colors"
                       />
@@ -1456,8 +1479,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input
                         type="email"
                         required
+                        maxLength={INPUT_LIMITS.EMAIL_MAX}
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => setEmail(e.target.value.slice(0, INPUT_LIMITS.EMAIL_MAX))}
                         placeholder="yourname@example.com"
                         className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--bg)] text-xs sm:text-sm font-mono text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--gold)] transition-colors"
                       />
@@ -1485,8 +1509,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
+                        maxLength={INPUT_LIMITS.PASSWORD_MAX}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => setPassword(e.target.value.slice(0, INPUT_LIMITS.PASSWORD_MAX))}
                         placeholder="••••••••"
                         className="w-full pl-9 pr-10 py-2 rounded-lg bg-[var(--bg)] text-xs sm:text-sm font-mono text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--gold)] transition-colors"
                       />

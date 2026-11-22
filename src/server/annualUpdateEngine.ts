@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import nodemailer from 'nodemailer';
+import { escapeHtml, sanitizeEmailSubject } from './emailSanitizer.ts';
 
 export interface SitePolicyItem {
   id: string;
@@ -201,7 +202,9 @@ async function sendAnnualUpdateEmail(manifest: SitePoliciesManifest, updateType:
       tls: { rejectUnauthorized: false },
     });
 
-    const subject = `[Annual Site Governance] Automatic Policy & Copyright Update Applied for ${manifest.effectiveYear}`;
+    const subject = sanitizeEmailSubject(
+      `[Annual Site Governance] Automatic Policy & Copyright Update Applied for ${manifest.effectiveYear}`
+    );
     const policyTitles = Object.values(manifest.policies).map(p => `• ${p.title} (v${p.version})`).join('\n');
 
     const htmlBody = `
@@ -212,26 +215,26 @@ async function sendAnnualUpdateEmail(manifest: SitePoliciesManifest, updateType:
   <div style="max-width:640px;margin:0 auto;background-color:#131B2E;border:1px solid #E2B867;border-radius:14px;overflow:hidden;padding:24px 30px;">
     <h2 style="color:#E2B867;margin-top:0;">🛡️ Automated Annual Policy &amp; Copyright Update</h2>
     <p style="color:#94A3B8;font-size:13px;line-height:1.6;">
-      The M R S Portfolio backend annual governance system has successfully updated all site legal policies, copyright notices, and compliance frameworks for the year <strong style="color:#F8FAFC;">${manifest.effectiveYear}</strong>.
+      The M R S Portfolio backend annual governance system has successfully updated all site legal policies, copyright notices, and compliance frameworks for the year <strong style="color:#F8FAFC;">${escapeHtml(manifest.effectiveYear)}</strong>.
     </p>
 
     <div style="background-color:#0E1524;padding:16px;border-radius:8px;margin:20px 0;border-left:3px solid #E2B867;">
       <div style="font-size:11px;color:#94A3B8;text-transform:uppercase;font-family:monospace;">Active Copyright Notice</div>
-      <div style="font-size:14px;color:#F8FAFC;font-weight:600;margin-top:4px;">${manifest.copyrightText}</div>
+      <div style="font-size:14px;color:#F8FAFC;font-weight:600;margin-top:4px;">${escapeHtml(manifest.copyrightText)}</div>
     </div>
 
     <h3 style="color:#F8FAFC;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Updated Site Policies</h3>
     <ul style="color:#94A3B8;font-size:13px;line-height:1.8;padding-left:20px;">
-      ${Object.values(manifest.policies).map(p => `<li><strong style="color:#F8FAFC;">${p.title}</strong> — ${p.shortDescription}</li>`).join('')}
+      ${Object.values(manifest.policies).map(p => `<li><strong style="color:#F8FAFC;">${escapeHtml(p.title)}</strong> — ${escapeHtml(p.shortDescription)}</li>`).join('')}
     </ul>
 
     <h3 style="color:#F8FAFC;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;margin:18px 0 10px 0;">Compliance Standards Enforced</h3>
     <ul style="color:#94A3B8;font-size:12.5px;line-height:1.7;padding-left:20px;">
-      ${manifest.legalComplianceStandards.map(s => `<li>${s}</li>`).join('')}
+      ${manifest.legalComplianceStandards.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
     </ul>
 
     <p style="font-size:11.5px;color:#64748B;margin-top:24px;border-top:1px solid rgba(255,255,255,0.08);padding-top:14px;">
-      Action executed autonomously by M R S Backend Annual Governance Service. Portfolio owner: ${manifest.ownerEmail}.
+      Action executed autonomously by M R S Backend Annual Governance Service. Portfolio owner: ${escapeHtml(manifest.ownerEmail)}.
     </p>
   </div>
 </body>

@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, Mail, X, CheckCircle2, Sparkles, Loader2 } from 'lucide-react';
+import {
+  INPUT_LIMITS,
+  isValidEmailAddress,
+  sanitizeEmailInput,
+  sanitizeSingleLineText,
+} from '../utils/inputSanitization';
 
 interface NewsletterSubscribePopupProps {
   theme: 'dark' | 'light';
@@ -96,7 +102,10 @@ export const NewsletterSubscribePopup: React.FC<NewsletterSubscribePopupProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) {
+    const cleanEmail = sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
+    const cleanName = sanitizeSingleLineText(name, INPUT_LIMITS.NAME_MAX);
+
+    if (!isValidEmailAddress(cleanEmail)) {
       setErrorMessage('Please provide a valid email address.');
       return;
     }
@@ -111,8 +120,8 @@ export const NewsletterSubscribePopup: React.FC<NewsletterSubscribePopupProps> =
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: email.trim(),
-          name: name.trim() || undefined,
+          email: cleanEmail,
+          name: cleanName || undefined,
           receivePlatformUpdates: true,
           receiveBlogUpdates: true,
         }),
@@ -214,8 +223,12 @@ export const NewsletterSubscribePopup: React.FC<NewsletterSubscribePopupProps> =
                   <input
                     type="email"
                     required
+                    maxLength={INPUT_LIMITS.EMAIL_MAX}
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value.slice(0, INPUT_LIMITS.EMAIL_MAX));
+                      if (errorMessage) setErrorMessage(null);
+                    }}
                     placeholder="Enter your email address..."
                     disabled={isSubmitting}
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-xl transition-colors bg-[var(--bg)] text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--gold)]"

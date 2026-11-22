@@ -42,6 +42,13 @@ import {
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import {
+  INPUT_LIMITS,
+  isValidEmailAddress,
+  sanitizeEmailInput,
+  sanitizeMultilineText,
+  sanitizeSingleLineText,
+} from '../utils/inputSanitization';
 
 interface GravatarProfileProps {
   profile: BioProfile;
@@ -128,6 +135,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
   const [inquiryName, setInquiryName] = useState('');
   const [inquiryEmail, setInquiryEmail] = useState('');
   const [inquiryNote, setInquiryNote] = useState('');
+  const [inquiryError, setInquiryError] = useState<string | null>(null);
   const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'sending' | 'smtp_success' | 'direct_ready'>('idle');
   const [lastDirectUrls, setLastDirectUrls] = useState<{ gmailUrl: string; mailtoUrl: string } | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -170,22 +178,38 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inquiryName.trim() || !inquiryNote.trim()) return;
+    setInquiryError(null);
+
+    const trimmedName = sanitizeSingleLineText(inquiryName, INPUT_LIMITS.NAME_MAX);
+    const cleanedEmail = sanitizeEmailInput(inquiryEmail, INPUT_LIMITS.EMAIL_MAX);
+    const trimmedMessage = sanitizeMultilineText(inquiryNote, INPUT_LIMITS.MESSAGE_MAX);
+
+    if (!trimmedName) {
+      setInquiryError('Please enter your name before sending an inquiry.');
+      return;
+    }
+    if (!isValidEmailAddress(cleanedEmail)) {
+      setInquiryError('Please enter a valid reply-to email address (e.g. alex@company.com).');
+      return;
+    }
+    if (!trimmedMessage) {
+      setInquiryError('Please enter your inquiry or support request details.');
+      return;
+    }
 
     setInquiryStatus('sending');
 
-    const trimmedName = inquiryName.trim().slice(0, 100);
-    const rawEmail = inquiryEmail.trim();
-    const validEmail = (rawEmail.length >= 3 ? rawEmail : 'visitor@example.com').slice(0, 128);
-    const trimmedSubject = `Portfolio Inquiry from ${trimmedName}`.slice(0, 200);
-    const trimmedMessage = inquiryNote.trim().slice(0, 2000);
+    const trimmedSubject = sanitizeSingleLineText(
+      `Portfolio Inquiry from ${trimmedName}`,
+      INPUT_LIMITS.SUBJECT_MAX
+    );
 
-    const result = await onSendInquiry(inquiryName, inquiryEmail, inquiryNote);
+    const result = await onSendInquiry(trimmedName, cleanedEmail, trimmedMessage);
 
     try {
       await addDoc(collection(db, 'inquiries'), {
         name: trimmedName,
-        email: validEmail,
+        email: cleanedEmail,
         subject: trimmedSubject,
         message: trimmedMessage,
         createdAt: new Date().toISOString(),
@@ -197,9 +221,9 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
       console.warn('Non-fatal Firestore inquiry notice:', fErr);
     }
 
-    const encodedSubject = encodeURIComponent(`Portfolio Inquiry from ${inquiryName}`);
+    const encodedSubject = encodeURIComponent(trimmedSubject);
     const encodedBody = encodeURIComponent(
-      `Hello M R S,\n\nSender: ${inquiryName}\nEmail: ${inquiryEmail || 'visitor@example.com'}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${inquiryNote}\n\n--\nSent via M R S Interactive Portfolio`
+      `Hello M R S,\n\nSender: ${trimmedName}\nEmail: ${cleanedEmail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${trimmedMessage}\n\n--\nSent via M R S Interactive Portfolio`
     );
     const gmailUrl =
       result?.directGmailUrl ||
@@ -224,9 +248,14 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
   };
 
   const getDirectComposeUrls = () => {
-    const encodedSubject = encodeURIComponent(`Portfolio Inquiry from ${inquiryName || 'Visitor'}`);
+    const cleanName = sanitizeSingleLineText(inquiryName, INPUT_LIMITS.NAME_MAX) || 'Visitor';
+    const cleanMail = sanitizeEmailInput(inquiryEmail, INPUT_LIMITS.EMAIL_MAX) || 'visitor@example.com';
+    const cleanBodyNote =
+      sanitizeMultilineText(inquiryNote, INPUT_LIMITS.MESSAGE_MAX) ||
+      'Hello M R S, I would like to get in touch regarding your IT support and web management services.';
+    const encodedSubject = encodeURIComponent(`Portfolio Inquiry from ${cleanName}`);
     const encodedBody = encodeURIComponent(
-      `Hello M R S,\n\nSender: ${inquiryName || 'Visitor'}\nEmail: ${inquiryEmail || 'visitor@example.com'}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${inquiryNote || 'Hello M R S, I would like to get in touch regarding your IT support and web management services.'}\n\n--\nSent via M R S Interactive Portfolio`
+      `Hello M R S,\n\nSender: ${cleanName}\nEmail: ${cleanMail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${cleanBodyNote}\n\n--\nSent via M R S Interactive Portfolio`
     );
     const gmailUrl =
       lastDirectUrls?.gmailUrl ||
@@ -1813,8 +1842,12 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
                 <input
                   type="text"
                   required
+                  maxLength={INPUT_LIMITS.NAME_MAX}
                   value={inquiryName}
-                  onChange={(e) => setInquiryName(e.target.value)}
+                  onChange={(e) => {
+                    setInquiryName(e.target.value.slice(0, INPUT_LIMITS.NAME_MAX));
+                    if (inquiryError) setInquiryError(null);
+                  }}
                   placeholder="Alex Smith"
                   className="w-full px-3.5 py-2.5 rounded-lg bg-[var(--bg)] ring-1 ring-[var(--border)] text-xs sm:text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--gold)] transition-all duration-150"
                 />
@@ -1827,8 +1860,12 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
                 <input
                   type="email"
                   required
+                  maxLength={INPUT_LIMITS.EMAIL_MAX}
                   value={inquiryEmail}
-                  onChange={(e) => setInquiryEmail(e.target.value)}
+                  onChange={(e) => {
+                    setInquiryEmail(e.target.value.slice(0, INPUT_LIMITS.EMAIL_MAX));
+                    if (inquiryError) setInquiryError(null);
+                  }}
                   placeholder="alex@company.com"
                   className="w-full px-3.5 py-2.5 rounded-lg bg-[var(--bg)] ring-1 ring-[var(--border)] text-xs sm:text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--gold)] transition-all duration-150"
                 />
@@ -1836,18 +1873,33 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                Project Brief, IT Support Ticket, or Inquiry
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-[var(--text-secondary)]">
+                  Project Brief, IT Support Ticket, or Inquiry
+                </label>
+                <span className="font-mono text-[10px] text-[var(--text-muted)]">
+                  {inquiryNote.length} / {INPUT_LIMITS.MESSAGE_MAX}
+                </span>
+              </div>
               <textarea
                 required
                 rows={4}
+                maxLength={INPUT_LIMITS.MESSAGE_MAX}
                 value={inquiryNote}
-                onChange={(e) => setInquiryNote(e.target.value)}
+                onChange={(e) => {
+                  setInquiryNote(e.target.value.slice(0, INPUT_LIMITS.MESSAGE_MAX));
+                  if (inquiryError) setInquiryError(null);
+                }}
                 placeholder="Describe your IT support requirement, remote administration task, or web project..."
                 className="w-full px-3.5 py-2.5 rounded-lg bg-[var(--bg)] ring-1 ring-[var(--border)] text-xs sm:text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--gold)] transition-all duration-150 resize-none"
               />
             </div>
+
+            {inquiryError && (
+              <div role="alert" className="p-3 rounded-lg bg-rose-500/12 text-[var(--danger-text)] text-xs font-medium">
+                {inquiryError}
+              </div>
+            )}
 
             {inquiryStatus === 'direct_ready' && (
               <div className="p-4 rounded-xl bg-[var(--panel)] space-y-3">
