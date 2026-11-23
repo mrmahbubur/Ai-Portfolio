@@ -95,3 +95,33 @@ export function sanitizeSafeHref(url?: string, allowMailto = false): string | un
     return undefined;
   }
 }
+
+/**
+ * Strips non-dialable characters from phone numbers for tel: links.
+ */
+export function sanitizePhoneHref(phone?: string, fallback = '+8809611056361'): string {
+  const cleaned = String(phone ?? '').replace(/[^\d+()-]/g, '').slice(0, 24);
+  return cleaned.length >= 6 ? cleaned : fallback;
+}
+
+/**
+ * Builds a sanitized mailto: URI from a validated email address and optional subject/body.
+ */
+export function sanitizeMailtoHref(
+  email?: string,
+  subject?: string,
+  body?: string,
+  fallbackEmail = 'mr216873@gmail.com'
+): string {
+  const cleanEmail = sanitizeEmailInput(email || '', INPUT_LIMITS.EMAIL_MAX);
+  const safeRecipient = isValidEmailAddress(cleanEmail) ? cleanEmail : fallbackEmail;
+  const params: string[] = [];
+  if (subject) {
+    params.push(`subject=${encodeURIComponent(sanitizeSingleLineText(subject, INPUT_LIMITS.SUBJECT_MAX))}`);
+  }
+  if (body) {
+    params.push(`body=${encodeURIComponent(sanitizeMultilineText(body, INPUT_LIMITS.MESSAGE_MAX))}`);
+  }
+  return `mailto:${encodeURIComponent(safeRecipient)}${params.length ? `?${params.join('&')}` : ''}`;
+}
+

@@ -46,7 +46,9 @@ import {
   INPUT_LIMITS,
   isValidEmailAddress,
   sanitizeEmailInput,
+  sanitizeMailtoHref,
   sanitizeMultilineText,
+  sanitizePhoneHref,
   sanitizeSafeHref,
   sanitizeSingleLineText,
 } from '../utils/inputSanitization';
@@ -229,16 +231,16 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
       console.warn('Non-fatal Firestore inquiry notice:', fErr);
     }
 
+    const emailSubject = `Portfolio Inquiry from ${trimmedName}`;
+    const emailBody = `Hello M R S,\n\nSender: ${trimmedName}\nEmail: ${cleanedEmail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${trimmedMessage}\n\n--\nSent via M R S Interactive Portfolio`;
     const encodedSubject = encodeURIComponent(trimmedSubject);
-    const encodedBody = encodeURIComponent(
-      `Hello M R S,\n\nSender: ${trimmedName}\nEmail: ${cleanedEmail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${trimmedMessage}\n\n--\nSent via M R S Interactive Portfolio`
-    );
+    const encodedBody = encodeURIComponent(emailBody);
     const gmailUrl =
-      result?.directGmailUrl ||
-      `https://mail.google.com/mail/?view=cm&fs=1&to=${recipientEmail}&su=${encodedSubject}&body=${encodedBody}`;
+      sanitizeSafeHref(result?.directGmailUrl) ||
+      `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodedSubject}&body=${encodedBody}`;
     const mailtoUrl =
-      result?.mailtoUrl ||
-      `mailto:${recipientEmail}?subject=${encodedSubject}&body=${encodedBody}`;
+      sanitizeSafeHref(result?.mailtoUrl, true) ||
+      sanitizeMailtoHref(recipientEmail, trimmedSubject || emailSubject, emailBody);
 
     setLastDirectUrls({ gmailUrl, mailtoUrl });
 
@@ -261,16 +263,16 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
     const cleanBodyNote =
       sanitizeMultilineText(inquiryNote, INPUT_LIMITS.MESSAGE_MAX) ||
       'Hello M R S, I would like to get in touch regarding your IT support and web management services.';
-    const encodedSubject = encodeURIComponent(`Portfolio Inquiry from ${cleanName}`);
-    const encodedBody = encodeURIComponent(
-      `Hello M R S,\n\nSender: ${cleanName}\nEmail: ${cleanMail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${cleanBodyNote}\n\n--\nSent via M R S Interactive Portfolio`
-    );
+    const composeSubject = `Portfolio Inquiry from ${cleanName}`;
+    const composeBody = `Hello M R S,\n\nSender: ${cleanName}\nEmail: ${cleanMail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${cleanBodyNote}\n\n--\nSent via M R S Interactive Portfolio`;
+    const encodedSubject = encodeURIComponent(composeSubject);
+    const encodedBody = encodeURIComponent(composeBody);
     const gmailUrl =
-      lastDirectUrls?.gmailUrl ||
-      `https://mail.google.com/mail/?view=cm&fs=1&to=${recipientEmail}&su=${encodedSubject}&body=${encodedBody}`;
+      sanitizeSafeHref(lastDirectUrls?.gmailUrl) ||
+      `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodedSubject}&body=${encodedBody}`;
     const mailtoUrl =
-      lastDirectUrls?.mailtoUrl ||
-      `mailto:${recipientEmail}?subject=${encodedSubject}&body=${encodedBody}`;
+      sanitizeSafeHref(lastDirectUrls?.mailtoUrl, true) ||
+      sanitizeMailtoHref(recipientEmail, composeSubject, composeBody);
     return { gmailUrl, mailtoUrl };
   };
 
@@ -1089,7 +1091,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
               isHighlighted(proj.id) || isHighlighted(proj.id.replace('proj-', ''));
             const cleanTitle = cleanProjectTitle(proj.title);
             const checkStr = `${proj.id} ${proj.category || ''} ${cleanTitle}`.toLowerCase();
-            const projectUrl = proj.link || 'https://gravatar.com/mrxshahin';
+            const projectUrl = sanitizeSafeHref(proj.link) || 'https://gravatar.com/mrxshahin';
             const domain = (() => {
               try {
                 return new URL(projectUrl).hostname.replace(/^www\./, '');
@@ -1411,7 +1413,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
           {/* Gravatar Hub */}
           <motion.a
             variants={activeItemVariants}
-            href={profile.socials.gravatarUrl || 'https://gravatar.com/mrxshahin'}
+            href={sanitizeSafeHref(profile.socials.gravatarUrl) || 'https://gravatar.com/mrxshahin'}
             target="_blank"
             rel="noopener noreferrer"
             data-allow-navigation="true"
@@ -1434,7 +1436,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
           {/* WordPress */}
           <motion.a
             variants={activeItemVariants}
-            href={profile.socials.wordpressUrl || 'https://mrxshahin.wordpress.com'}
+            href={sanitizeSafeHref(profile.socials.wordpressUrl) || 'https://mrxshahin.wordpress.com'}
             target="_blank"
             rel="noopener noreferrer"
             data-allow-navigation="true"
@@ -1457,7 +1459,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
           {/* LinkedIn */}
           <motion.a
             variants={activeItemVariants}
-            href={profile.socials.linkedinUrl || 'https://www.linkedin.com/in/mrmahbubur'}
+            href={sanitizeSafeHref(profile.socials.linkedinUrl) || 'https://www.linkedin.com/in/mrmahbubur'}
             target="_blank"
             rel="noopener noreferrer"
             data-allow-navigation="true"
@@ -1480,7 +1482,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
           {/* GitHub */}
           <motion.a
             variants={activeItemVariants}
-            href={profile.socials.githubUrl || 'https://github.com/mrmahbubur'}
+            href={sanitizeSafeHref(profile.socials.githubUrl) || 'https://github.com/mrmahbubur'}
             target="_blank"
             rel="noopener noreferrer"
             data-allow-navigation="true"
@@ -1503,7 +1505,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
           {/* X */}
           <motion.a
             variants={activeItemVariants}
-            href={profile.socials.xUrl || 'https://x.com/Mrshahinx'}
+            href={sanitizeSafeHref(profile.socials.xUrl) || 'https://x.com/Mrshahinx'}
             target="_blank"
             rel="noopener noreferrer"
             data-allow-navigation="true"
@@ -1526,7 +1528,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
           {/* Bluesky */}
           <motion.a
             variants={activeItemVariants}
-            href={profile.socials.blueskyUrl || 'https://bsky.app/profile/mrxshahin.bsky.social'}
+            href={sanitizeSafeHref(profile.socials.blueskyUrl) || 'https://bsky.app/profile/mrxshahin.bsky.social'}
             target="_blank"
             rel="noopener noreferrer"
             data-allow-navigation="true"
@@ -1549,7 +1551,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
           {/* Calendly */}
           <motion.a
             variants={activeItemVariants}
-            href={profile.socials.calendlyUrl || 'https://calendly.com/mrxshahin'}
+            href={sanitizeSafeHref(profile.socials.calendlyUrl) || 'https://calendly.com/mrxshahin'}
             target="_blank"
             rel="noopener noreferrer"
             data-allow-navigation="true"
@@ -1572,7 +1574,10 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
           {/* Cloud / Admin Web Portal */}
           {(() => {
             const adminProj = (profile.projects || []).find((p) => /cloud|admin/i.test(`${p.id} ${p.title}`));
-            const portalUrl = adminProj?.link || profile.socials.contactForm || 'https://mrmahbubur.github.io/Admin/';
+            const portalUrl =
+              sanitizeSafeHref(adminProj?.link) ||
+              sanitizeSafeHref(profile.socials.contactForm) ||
+              'https://mrmahbubur.github.io/Admin/';
             let portalHost = 'mrmahbubur.github.io';
             try {
               portalHost = new URL(portalUrl).hostname.replace(/^www\./, '');
@@ -1608,9 +1613,12 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
             <motion.a
               variants={activeItemVariants}
               href={
-                profile.socials.goodreadsUrl ||
-                (profile.verifiedAccounts || []).find((acc) => /goodreads/i.test(acc.name || acc.shortname || ''))?.url ||
-                'https://www.goodreads.com/mrxshahin'
+                sanitizeSafeHref(
+                  profile.socials.goodreadsUrl ||
+                    (profile.verifiedAccounts || []).find((acc) =>
+                      /goodreads/i.test(acc.name || acc.shortname || '')
+                    )?.url
+                ) || 'https://www.goodreads.com/mrxshahin'
               }
               target="_blank"
               rel="noopener noreferrer"
@@ -1742,7 +1750,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
                 </span>
                 <div className="flex items-center justify-between gap-2">
                   <a
-                    href={`mailto:${recipientEmail}`}
+                    href={sanitizeMailtoHref(recipientEmail)}
                     className="font-mono text-sm sm:text-base text-[var(--gold)] hover:underline flex items-center gap-2 break-all font-semibold"
                   >
                     <Mail className="w-4 h-4 text-[var(--gold)] shrink-0" />
@@ -1774,7 +1782,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
                 <div className="flex items-center justify-between text-[var(--text-secondary)]">
                   <span className="text-[var(--text-muted)]">Direct Phone:</span>
                   <a
-                    href={`tel:${profile.socials?.phone || '+8809611056361'}`}
+                    href={`tel:${sanitizePhoneHref(profile.socials?.phone)}`}
                     className="hover:text-[var(--gold)] transition-colors tabular-nums"
                   >
                     {profile.socials?.phone || '+8809611056361'}
@@ -2141,7 +2149,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
 
             <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
               <WebsiteThumbnail
-                url={inspectedProject.link || 'https://gravatar.com/mrxshahin'}
+                url={sanitizeSafeHref(inspectedProject.link) || 'https://gravatar.com/mrxshahin'}
                 title={cleanProjectTitle(inspectedProject.title)}
                 badge={inspectedProject.badge || inspectedProject.category}
                 customImage={inspectedProject.customThumbnail}
@@ -2156,7 +2164,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
                   <span className="text-[11px] font-mono text-[var(--gold)] truncate">
                     {(() => {
                       try {
-                        return new URL(inspectedProject.link || 'https://gravatar.com/mrxshahin').hostname.replace(/^www\./, '');
+                        return new URL(sanitizeSafeHref(inspectedProject.link) || 'https://gravatar.com/mrxshahin').hostname.replace(/^www\./, '');
                       } catch {
                         return 'verified-platform';
                       }
@@ -2197,7 +2205,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard?.writeText(inspectedProject.link || 'https://gravatar.com/mrxshahin');
+                      navigator.clipboard?.writeText(sanitizeSafeHref(inspectedProject.link) || 'https://gravatar.com/mrxshahin');
                       setCopiedProjectUrl(true);
                       setTimeout(() => setCopiedProjectUrl(false), 2000);
                     }}
@@ -2209,7 +2217,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
                 </div>
 
                 <a
-                  href={inspectedProject.link || 'https://gravatar.com/mrxshahin'}
+                  href={sanitizeSafeHref(inspectedProject.link) || 'https://gravatar.com/mrxshahin'}
                   target="_blank"
                   rel="noopener noreferrer"
                   data-allow-navigation="true"

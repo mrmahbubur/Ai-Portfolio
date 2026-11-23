@@ -4807,7 +4807,11 @@ async function startServer() {
     const reqPath = req.path && req.path !== "/" ? req.path.replace(/\/+$/, "") : "/";
     const canonicalUrl = escapeHtml(`${baseOrigin}${reqPath === "/" ? "/" : reqPath}`);
     const imageAbsUrl = escapeHtml(`${baseOrigin}/mrs_profile_avatar.jpg`);
-    const websiteJsonUrl = `${baseOrigin}/`.replace(/"/g, '\\"');
+    const websiteJsonUrl = `${baseOrigin}/`.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/</g, "\\u003c");
+    const jsonImageAbsUrl = `${baseOrigin}/mrs_profile_avatar.jpg`
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/</g, "\\u003c");
 
     return rawHtml
       .replace(
@@ -4835,8 +4839,12 @@ async function startServer() {
         `"url": "${websiteJsonUrl}"`
       )
       .replace(
+        /"url":\s*"\/mrs_profile_avatar\.jpg"/g,
+        `"url": "${jsonImageAbsUrl}"`
+      )
+      .replace(
         /"image":\s*"\/mrs_profile_avatar\.jpg"/g,
-        `"image": "${escapeHtml(`${baseOrigin}/mrs_profile_avatar.jpg`).replace(/"/g, '\\"')}"`
+        `"image": "${jsonImageAbsUrl}"`
       );
   };
 
@@ -4888,51 +4896,238 @@ async function startServer() {
     });
   }
 
-  const liveWss = new WebSocketServer({ noServer: true });
+  const MAX_LIVE_WS_GLOBAL = 25;
+  const MAX_LIVE_WS_PER_IP = 4;
+  const MAX_LIVE_UPGRADES_PER_MIN = 20;
+  const LIVE_WS_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+  const ALLOWED_LIVE_VIDEO_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+  let activeLiveWsGlobal = 0;
+  const activeLiveWsByIp = new Map<string, number>();
+  const liveUpgradeAttemptsByIp = new Map<string, number[]>();
+
+  const getWsClientIp = (req: http.IncomingMessage): string => {
+    const fwd = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+    const raw = fwd || req.socket?.remoteAddress || "unknown";
+    return raw.slice(0, 64);
+  };
+
+  const isAllowedWebSocketOrigin = (req: http.IncomingMessage): boolean => {
+    const originHeader = String(req.headers.origin || "").trim();
+    if (!originHeader) return false;
+
+    let parsedOrigin: URL;
+    try {
+      parsedOrigin = new URL(originHeader);
+    } catch {
+      return false;
+    }
+
+    if (parsedOrigin.protocol !== "https:" && parsedOrigin.protocol !== "http:") {
+      return false;
+    }
+
+    const allowedHosts = new Set<string>();
+    const addHost = (rawHost: string) => {
+      const cleaned = rawHost.split(",")[0].trim().toLowerCase();
+      if (cleaned) allowedHosts.add(cleaned);
+    };
+
+    if (typeof req.headers["x-forwarded-host"] === "string") {
+      addHost(req.headers["x-forwarded-host"]);
+    }
+    if (typeof req.headers.host === "string") {
+      addHost(req.headers.host);
+    }
+    if (process.env.APP_URL) {
+      try {
+        allowedHosts.add(new URL(cleanSiteUrl(process.env.APP_URL)).host.toLowerCase());
+      } catch {}
+    }
+
+    return allowedHosts.has(parsedOrigin.host.toLowerCase());
+  };
+
+  const rejectWsUpgrade = (socket: any, statusCode: number, reason: string) => {
+    try {
+      socket.write(
+        `HTTP/1.1 ${statusCode} ${reason}\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(reason)}\r\n\r\n${reason}`
+      );
+    } catch {}
+    try {
+      socket.destroy();
+    } catch {}
+  };
+
+  const liveWss = new WebSocketServer({
+    noServer: true,
+    maxPayload: 2 * 1024 * 1024,
+  });
 
   server.on("upgrade", (req, socket, head) => {
     try {
       const reqUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-      if (reqUrl.pathname === "/api/live") {
-        liveWss.handleUpgrade(req, socket, head, (ws) => {
-          liveWss.emit("connection", ws, req);
-        });
-      } else {
+      if (reqUrl.pathname !== "/api/live") {
         socket.destroy();
+        return;
       }
+
+      if (!isAllowedWebSocketOrigin(req)) {
+        console.warn(`[WebSocket] Blocked unauthorized upgrade origin: ${String(req.headers.origin || "missing")}`);
+        rejectWsUpgrade(socket, 403, "Forbidden");
+        return;
+      }
+
+      const clientIp = getWsClientIp(req);
+      const now = Date.now();
+      const recentAttempts = (liveUpgradeAttemptsByIp.get(clientIp) || []).filter((ts) => now - ts < 60_000);
+      if (recentAttempts.length >= MAX_LIVE_UPGRADES_PER_MIN) {
+        liveUpgradeAttemptsByIp.set(clientIp, recentAttempts);
+        rejectWsUpgrade(socket, 429, "Too Many Requests");
+        return;
+      }
+      recentAttempts.push(now);
+      liveUpgradeAttemptsByIp.set(clientIp, recentAttempts);
+
+      // Bound map growth during high churn
+      if (liveUpgradeAttemptsByIp.size > 500) {
+        for (const [ip, timestamps] of liveUpgradeAttemptsByIp.entries()) {
+          const valid = timestamps.filter((ts) => now - ts < 60_000);
+          if (valid.length === 0) liveUpgradeAttemptsByIp.delete(ip);
+          else liveUpgradeAttemptsByIp.set(ip, valid);
+        }
+      }
+
+      const ipActive = activeLiveWsByIp.get(clientIp) || 0;
+      if (activeLiveWsGlobal >= MAX_LIVE_WS_GLOBAL || ipActive >= MAX_LIVE_WS_PER_IP) {
+        rejectWsUpgrade(socket, 429, "Too Many Requests");
+        return;
+      }
+
+      liveWss.handleUpgrade(req, socket, head, (ws) => {
+        liveWss.emit("connection", ws, req);
+      });
     } catch {
-      socket.destroy();
+      try {
+        socket.destroy();
+      } catch {}
     }
   });
 
   liveWss.on("connection", async (clientWs: WebSocket, req) => {
-    const reqUrl = new URL(req.url || "/api/live", `http://${req.headers.host || "localhost"}`);
-    const lang = reqUrl.searchParams.get("lang") || "en-US";
-    const apiKey = process.env.GEMINI_API_KEY;
+    const clientIp = getWsClientIp(req);
+    activeLiveWsGlobal += 1;
+    activeLiveWsByIp.set(clientIp, (activeLiveWsByIp.get(clientIp) || 0) + 1);
 
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-      clientWs.send(JSON.stringify({ type: "error", message: "Real-time Live API key is not configured on the server." }));
-      clientWs.close();
-      return;
-    }
+    const reqUrl = new URL(req.url || "/api/live", `http://${req.headers.host || "localhost"}`);
+    const rawLang = (reqUrl.searchParams.get("lang") || "en-US").trim();
+    const lang = /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})?$/.test(rawLang) ? rawLang : "en-US";
+    const apiKey = process.env.GEMINI_API_KEY;
 
     let liveSession: any = null;
     let isClosed = false;
+    let isCleanedUp = false;
+    let idleTimer: NodeJS.Timeout | null = null;
     const pendingPayloads: any[] = [];
 
+    const cleanupSocket = () => {
+      if (isCleanedUp) return;
+      isCleanedUp = true;
+      isClosed = true;
+
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+
+      activeLiveWsGlobal = Math.max(0, activeLiveWsGlobal - 1);
+      const nextCount = (activeLiveWsByIp.get(clientIp) || 1) - 1;
+      if (nextCount <= 0) {
+        activeLiveWsByIp.delete(clientIp);
+      } else {
+        activeLiveWsByIp.set(clientIp, nextCount);
+      }
+
+      try {
+        liveSession?.close?.();
+      } catch {}
+    };
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (!isClosed && clientWs.readyState === WebSocket.OPEN) {
+          try {
+            clientWs.send(JSON.stringify({ type: "error", message: "Live voice session closed due to inactivity." }));
+            clientWs.close(1000, "Idle timeout");
+          } catch {}
+        }
+        cleanupSocket();
+      }, LIVE_WS_IDLE_TIMEOUT_MS);
+    };
+
+    clientWs.on("close", cleanupSocket);
+    clientWs.on("error", () => {
+      cleanupSocket();
+      try {
+        clientWs.terminate();
+      } catch {}
+    });
+
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+      try {
+        clientWs.send(JSON.stringify({ type: "error", message: "Real-time Live API key is not configured on the server." }));
+        clientWs.close();
+      } catch {}
+      cleanupSocket();
+      return;
+    }
+
+    resetIdleTimer();
+
+    const isValidLivePayload = (payload: unknown): payload is Record<string, any> => {
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+      const candidate = payload as Record<string, any>;
+      switch (candidate.type) {
+        case "audio":
+          return typeof candidate.data === "string" && candidate.data.length > 0 && candidate.data.length <= 512_000;
+        case "video": {
+          const mime = candidate.mimeType === undefined ? "image/jpeg" : String(candidate.mimeType);
+          return (
+            typeof candidate.data === "string" &&
+            candidate.data.length > 0 &&
+            candidate.data.length <= 1_500_000 &&
+            ALLOWED_LIVE_VIDEO_MIMES.has(mime)
+          );
+        }
+        case "text":
+          return typeof candidate.text === "string" && candidate.text.trim().length > 0 && candidate.text.length <= 2000;
+        case "audio_stream_end":
+        case "close":
+          return true;
+        default:
+          return false;
+      }
+    };
+
     const dispatchLivePayload = (payload: any) => {
-      if (!liveSession || isClosed) return;
-      if (payload.type === "audio" && payload.data) {
+      if (!liveSession || isClosed || !isValidLivePayload(payload)) return;
+      if (payload.type === "audio") {
         liveSession.sendRealtimeInput({
-          audio: { data: String(payload.data), mimeType: "audio/pcm;rate=16000" },
+          audio: { data: payload.data, mimeType: "audio/pcm;rate=16000" },
         });
-      } else if (payload.type === "video" && payload.data) {
+      } else if (payload.type === "video") {
         liveSession.sendRealtimeInput({
-          video: { data: String(payload.data), mimeType: String(payload.mimeType || "image/jpeg") },
+          video: {
+            data: payload.data,
+            mimeType: typeof payload.mimeType === "string" && ALLOWED_LIVE_VIDEO_MIMES.has(payload.mimeType)
+              ? payload.mimeType
+              : "image/jpeg",
+          },
         });
-      } else if (payload.type === "text" && payload.text) {
+      } else if (payload.type === "text") {
         liveSession.sendClientContent({
-          turns: [{ role: "user", parts: [{ text: String(payload.text) }] }],
+          turns: [{ role: "user", parts: [{ text: payload.text.trim() }] }],
           turnComplete: true,
         });
       } else if (payload.type === "audio_stream_end") {
@@ -4945,7 +5140,11 @@ async function startServer() {
     clientWs.on("message", (raw) => {
       if (isClosed) return;
       try {
-        const payload = JSON.parse(raw.toString());
+        const rawText = typeof raw === "string" ? raw : raw.toString("utf8");
+        if (rawText.length > 1_800_000) return;
+        const payload = JSON.parse(rawText);
+        if (!isValidLivePayload(payload)) return;
+        resetIdleTimer();
         if (!liveSession) {
           if (pendingPayloads.length < 25) pendingPayloads.push(payload);
           return;
@@ -4954,13 +5153,6 @@ async function startServer() {
       } catch {
         // Ignore malformed frame
       }
-    });
-
-    clientWs.on("close", () => {
-      isClosed = true;
-      try {
-        liveSession?.close?.();
-      } catch {}
     });
 
     try {
@@ -5028,7 +5220,7 @@ async function startServer() {
       }
 
       if (isClosed || clientWs.readyState !== WebSocket.OPEN) {
-        try { liveSession?.close?.(); } catch {}
+        cleanupSocket();
         return;
       }
 
@@ -5040,9 +5232,12 @@ async function startServer() {
     } catch (err: any) {
       console.warn("[GeminiLive] Connection failed:", err?.message || err);
       if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(JSON.stringify({ type: "error", message: err?.message || "Unable to open Live voice session." }));
-        clientWs.close();
+        try {
+          clientWs.send(JSON.stringify({ type: "error", message: err?.message || "Unable to open Live voice session." }));
+          clientWs.close();
+        } catch {}
       }
+      cleanupSocket();
       return;
     }
   });

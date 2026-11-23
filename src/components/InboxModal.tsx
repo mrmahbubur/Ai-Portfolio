@@ -15,6 +15,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
+import { sanitizeMailtoHref } from '../utils/inputSanitization';
 
 interface InboxModalProps {
   isOpen: boolean;
@@ -160,11 +161,12 @@ export const InboxModal: React.FC<InboxModalProps> = ({
                     <div className="flex items-center gap-2">
                       {/* Direct Reply Link via Mailto */}
                       <a
-                        href={`mailto:${inq.senderEmail}?subject=${encodeURIComponent(
-                          `Re: Inquiry from ${ownerEmail}`
-                        )}&body=${encodeURIComponent(
-                          `\n\n--- Original Inquiry ---\nFrom: ${inq.senderName} (${inq.senderEmail})\nDate: ${formattedDate}\n\n${inq.message}`
-                        )}`}
+                        href={sanitizeMailtoHref(
+                          inq.senderEmail,
+                          `Re: Inquiry from ${ownerEmail}`,
+                          `\n\n--- Original Inquiry ---\nFrom: ${inq.senderName} (${inq.senderEmail})\nDate: ${formattedDate}\n\n${inq.message}`,
+                          ownerEmail
+                        )}
                         className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--gold)] hover:bg-[var(--gold-hover)] text-[var(--gold-ink)] font-semibold transition-colors cursor-pointer shadow-sm"
                       >
                         <Mail className="w-3 h-3" />

@@ -37,7 +37,7 @@ import {
   User,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { auth, googleAuthProvider, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, googleAuthProvider, db, handleFirestoreError, OperationType, writeStoredAuthUser } from '../lib/firebase';
 import { formatFirebaseAuthError } from '../lib/firebaseAuthErrors';
 import {
   INPUT_LIMITS,
@@ -349,9 +349,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           isServerAccount: true,
         };
 
-        try {
-          localStorage.setItem('mrs_auth_user', JSON.stringify(activeUser));
-        } catch {}
+        const persistedUser = writeStoredAuthUser(activeUser) || activeUser;
 
         // Non-fatal parallel sign-in with Firebase if available
         try {
@@ -360,7 +358,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           console.debug('Parallel Firebase auth sync notice:', formatFirebaseAuthError(fbSyncErr));
         }
 
-        onUserChanged?.(activeUser as any);
+        onUserChanged?.(persistedUser as any);
         setSuccessMsg('Signed in successfully! Your subscriber preferences are active.');
         onAnnounce?.(`Welcome back! You are signed in.`);
         setTimeout(() => {
@@ -379,9 +377,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           photoURL: cred.user.photoURL,
           emailVerified: cred.user.emailVerified,
         };
-        try {
-          localStorage.setItem('mrs_auth_user', JSON.stringify(fbUser));
-        } catch {}
+        writeStoredAuthUser(fbUser);
 
         onUserChanged?.(cred.user);
         await syncUserToFirestore(cred.user);
@@ -529,12 +525,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         isServerAccount: !firebaseUser,
       };
 
-      try {
-        localStorage.setItem('mrs_auth_user', JSON.stringify(activeUser));
-      } catch (storageErr) {}
+      const persistedUser = writeStoredAuthUser(activeUser) || activeUser;
 
       // 4. Update session
-      onUserChanged?.(activeUser as any);
+      onUserChanged?.(persistedUser as any);
 
       // 5. Display dedicated Firebase verification notice in AuthModal
       setSignupVerificationNotice({
@@ -729,12 +723,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         ...currentUser,
         displayName: cleanName,
       };
-      try {
-        localStorage.setItem('mrs_auth_user', JSON.stringify(updatedUser));
-      } catch (storageErr) {}
+      const persistedUser = writeStoredAuthUser(updatedUser) || updatedUser;
 
       setSuccessMsg('Display name updated successfully!');
-      onUserChanged?.(updatedUser);
+      onUserChanged?.(persistedUser);
     } catch (err) {
       setErrorMsg('Failed to update display name.');
     } finally {
@@ -824,10 +816,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         receivePlatformUpdates,
         receiveBlogUpdates,
       };
-      try {
-        localStorage.setItem('mrs_auth_user', JSON.stringify(updatedUser));
-      } catch (storageErr) {}
-      onUserChanged?.(updatedUser);
+      const persistedUser = writeStoredAuthUser(updatedUser) || updatedUser;
+      onUserChanged?.(persistedUser);
 
       setSuccessMsg('Notification preferences updated & synchronized with server!');
       onAnnounce?.('Notification preferences saved successfully.');
@@ -843,9 +833,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleSignOut = async () => {
     setErrorMsg(null);
     try {
-      try {
-        localStorage.removeItem('mrs_auth_user');
-      } catch {}
+      writeStoredAuthUser(null);
       if (auth.currentUser) {
         await signOut(auth);
       }

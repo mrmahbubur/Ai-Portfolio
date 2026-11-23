@@ -30,6 +30,7 @@ import {
 import { Message, BioProfile } from '../types';
 import { audioEngine } from '../utils/audio';
 import { CAMELLIA_AVATAR_SRC } from '../constants/persona';
+import { sanitizeSafeHref } from '../utils/inputSanitization';
 
 export interface ChatAttachment {
   name: string;
@@ -1281,18 +1282,22 @@ export const CamelliaChatPanel: React.FC<CamelliaChatPanelProps> = ({
                           <Sparkles className="w-3 h-3" /> Grounded Search Sources:
                         </span>
                         <div className="flex flex-wrap gap-1.5">
-                          {msg.sources.map((src, sIdx) => (
-                            <a
-                              key={sIdx}
-                              href={src.uri}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2 py-0.5 rounded bg-[var(--panel-raised)] hover:bg-[var(--panel-hover)] text-[var(--text-secondary)] hover:text-[var(--gold)] border border-[var(--border)] inline-flex items-center gap-1 text-[11px] truncate max-w-[200px]"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                              <span className="truncate">{src.title || src.uri}</span>
-                            </a>
-                          ))}
+                          {msg.sources.map((src, sIdx) => {
+                            const safeSrcUri = sanitizeSafeHref(src.uri);
+                            if (!safeSrcUri) return null;
+                            return (
+                              <a
+                                key={sIdx}
+                                href={safeSrcUri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-0.5 rounded bg-[var(--panel-raised)] hover:bg-[var(--panel-hover)] text-[var(--text-secondary)] hover:text-[var(--gold)] border border-[var(--border)] inline-flex items-center gap-1 text-[11px] truncate max-w-[200px]"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                                <span className="truncate">{src.title || safeSrcUri}</span>
+                              </a>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

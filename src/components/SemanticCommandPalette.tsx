@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, ArrowUpRight, Volume2, Radio, Sparkles, Compass } from 'lucide-react';
+import { sanitizeSafeHref } from '../utils/inputSanitization';
 
 export interface SemanticSearchResult {
   id: string;
@@ -223,9 +224,9 @@ export const SemanticCommandPalette: React.FC<SemanticCommandPaletteProps> = ({
                       </button>
                     )}
 
-                    {item.url && (
+                    {sanitizeSafeHref(item.url) && (
                       <a
-                        href={item.url}
+                        href={sanitizeSafeHref(item.url)}
                         target="_blank"
                         rel={item.type === 'sponsor' ? 'noopener noreferrer sponsored' : 'noopener noreferrer'}
                         data-allow-navigation="true"

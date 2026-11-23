@@ -20,7 +20,7 @@ import { getExplanationForSection } from './data/explanations';
 import { audioEngine } from './utils/audio';
 import { detectBrowserLanguage, getLanguageByCode, getLocalizedGreeting } from './utils/languages';
 import { generateIntelligentAnswer } from './utils/intelligentQA';
-import { auth, authPersistencePromise, parseStoredAuthUser } from './lib/firebase';
+import { auth, authPersistencePromise, parseStoredAuthUser, writeStoredAuthUser } from './lib/firebase';
 import { formatFirebaseAuthError } from './lib/firebaseAuthErrors';
 import {
   INPUT_LIMITS,
@@ -241,7 +241,7 @@ export default function App() {
         const raw = localStorage.getItem('mrs_auth_user');
         const parsed = parseStoredAuthUser(raw);
         if (raw && !parsed) {
-          localStorage.removeItem('mrs_auth_user');
+          writeStoredAuthUser(null);
         }
         return parsed;
       } catch {}
@@ -345,11 +345,9 @@ export default function App() {
             isServerAccount: false,
           };
 
-          setCurrentUser(mergedSession);
+          const persisted = writeStoredAuthUser(mergedSession);
+          setCurrentUser(persisted || mergedSession);
           setAuthListenerError(null);
-          try {
-            localStorage.setItem('mrs_auth_user', JSON.stringify(mergedSession));
-          } catch {}
         } else {
           try {
             const raw = localStorage.getItem('mrs_auth_user');
@@ -367,22 +365,18 @@ export default function App() {
                     receivePlatformUpdates: Boolean(data.subscriber.receivePlatformUpdates),
                     receiveBlogUpdates: Boolean(data.subscriber.receiveBlogUpdates),
                   };
-                  setCurrentUser(refreshed);
-                  try {
-                    localStorage.setItem('mrs_auth_user', JSON.stringify(refreshed));
-                  } catch {}
+                  const persistedRefreshed = writeStoredAuthUser(refreshed);
+                  setCurrentUser(persistedRefreshed || refreshed);
                 })
                 .catch(() => {});
             } else {
               if (raw) {
-                localStorage.removeItem('mrs_auth_user');
+                writeStoredAuthUser(null);
               }
               setCurrentUser(null);
             }
           } catch {
-            try {
-              localStorage.removeItem('mrs_auth_user');
-            } catch {}
+            writeStoredAuthUser(null);
             setCurrentUser(null);
           }
         }

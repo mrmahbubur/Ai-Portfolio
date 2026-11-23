@@ -10,6 +10,15 @@ import {
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { formatFirebaseAuthError } from './firebaseAuthErrors';
+import {
+  INPUT_LIMITS,
+  isValidEmailAddress,
+  sanitizeEmailInput,
+  sanitizeSafeHref,
+  sanitizeSingleLineText,
+} from '../utils/inputSanitization';
+
+const VALID_UID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
 export interface AuthSessionUser {
   uid: string;
@@ -22,30 +31,78 @@ export interface AuthSessionUser {
   isServerAccount?: boolean;
 }
 
+export function normalizeAuthSessionUser(candidate: unknown): AuthSessionUser | null {
+  if (!candidate || typeof candidate !== 'object') return null;
+  const raw = candidate as Record<string, unknown>;
+
+  if (typeof raw.uid !== 'string') return null;
+  const uid = raw.uid.trim();
+  if (!VALID_UID_PATTERN.test(uid)) return null;
+
+  let email: string | null = null;
+  if (raw.email !== null && raw.email !== undefined) {
+    if (typeof raw.email !== 'string') return null;
+    const cleanEmail = sanitizeEmailInput(raw.email, INPUT_LIMITS.EMAIL_MAX);
+    if (cleanEmail) {
+      if (!isValidEmailAddress(cleanEmail)) return null;
+      email = cleanEmail;
+    }
+  }
+
+  const isServerAccount = Boolean(raw.isServerAccount);
+  if (isServerAccount && !email) {
+    return null;
+  }
+
+  const displayName =
+    typeof raw.displayName === 'string'
+      ? sanitizeSingleLineText(raw.displayName, INPUT_LIMITS.NAME_MAX) || null
+      : null;
+
+  const photoURL =
+    typeof raw.photoURL === 'string'
+      ? sanitizeSafeHref(raw.photoURL) || null
+      : null;
+
+  return {
+    uid,
+    email,
+    displayName,
+    photoURL,
+    emailVerified: Boolean(raw.emailVerified),
+    receivePlatformUpdates:
+      raw.receivePlatformUpdates !== undefined ? Boolean(raw.receivePlatformUpdates) : undefined,
+    receiveBlogUpdates:
+      raw.receiveBlogUpdates !== undefined ? Boolean(raw.receiveBlogUpdates) : undefined,
+    isServerAccount,
+  };
+}
+
 export function parseStoredAuthUser(raw: string | null): AuthSessionUser | null {
   if (!raw || typeof raw !== 'string') return null;
+  if (raw.length > 8192) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return null;
-    if (typeof parsed.uid !== 'string' || !parsed.uid.trim()) return null;
-    if (parsed.email !== null && parsed.email !== undefined && typeof parsed.email !== 'string') {
-      return null;
-    }
-    return {
-      uid: parsed.uid.trim().slice(0, 128),
-      email: typeof parsed.email === 'string' ? parsed.email.trim().slice(0, 128) : null,
-      displayName: typeof parsed.displayName === 'string' ? parsed.displayName.slice(0, 100) : null,
-      photoURL: typeof parsed.photoURL === 'string' ? parsed.photoURL : null,
-      emailVerified: Boolean(parsed.emailVerified),
-      receivePlatformUpdates:
-        parsed.receivePlatformUpdates !== undefined ? Boolean(parsed.receivePlatformUpdates) : undefined,
-      receiveBlogUpdates:
-        parsed.receiveBlogUpdates !== undefined ? Boolean(parsed.receiveBlogUpdates) : undefined,
-      isServerAccount: Boolean(parsed.isServerAccount),
-    };
+    return normalizeAuthSessionUser(parsed);
   } catch {
     return null;
   }
+}
+
+export function writeStoredAuthUser(candidate: unknown): AuthSessionUser | null {
+  if (typeof window === 'undefined') return null;
+  if (!candidate) {
+    try {
+      localStorage.removeItem('mrs_auth_user');
+    } catch {}
+    return null;
+  }
+  const normalized = normalizeAuthSessionUser(candidate);
+  if (!normalized) return null;
+  try {
+    localStorage.setItem('mrs_auth_user', JSON.stringify(normalized));
+  } catch {}
+  return normalized;
 }
 
 const app = initializeApp(firebaseConfig);
