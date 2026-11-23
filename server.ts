@@ -29,7 +29,10 @@ import {
 } from "./src/server/subscribers.ts";
 import {
   escapeHtml,
+  escapeJsonLdString,
   safeEmailHref,
+  safeGmailComposeHref,
+  safeMailtoHref,
   sanitizeEmailSubject,
   stripCrlf,
   stripHtmlTags,
@@ -3269,7 +3272,13 @@ app.post("/api/inquiries", async (req, res) => {
     const safeHtmlName = escapeHtml(senderName);
     const safeHtmlEmail = escapeHtml(senderEmail);
     const safeHtmlNote = escapeHtml(senderNote);
-    const encodedMailtoEmail = encodeURIComponent(senderEmail);
+    const safeReplyHref = escapeHtml(safeMailtoHref(senderEmail, { fallbackEmail: destinationEmail }));
+    const safeReplySubjectHref = escapeHtml(
+      safeMailtoHref(senderEmail, {
+        subject: "Re: Portfolio Inquiry - MRS",
+        fallbackEmail: destinationEmail,
+      })
+    );
 
     const transporter = getSmtpTransporter();
     let smtpDelivered = false;
@@ -3300,7 +3309,7 @@ app.post("/api/inquiries", async (req, res) => {
                   </tr>
                   <tr>
                     <td style="padding: 6px 0; color: #9CA3AF;"><strong>Email:</strong></td>
-                    <td style="padding: 6px 0; color: #1D8FF2;"><a href="mailto:${encodedMailtoEmail}" style="color: #1D8FF2; text-decoration: none;">${safeHtmlEmail}</a></td>
+                    <td style="padding: 6px 0; color: #1D8FF2;"><a href="${safeReplyHref}" style="color: #1D8FF2; text-decoration: none;">${safeHtmlEmail}</a></td>
                   </tr>
                   <tr>
                     <td style="padding: 6px 0; color: #9CA3AF;"><strong>Time (UTC):</strong></td>
@@ -3316,7 +3325,7 @@ app.post("/api/inquiries", async (req, res) => {
 
               <div style="text-align: center; border-top: 1px solid #1F2937; padding-top: 16px; margin-top: 24px; font-size: 12px; color: #6B7280;">
                 <p style="margin: 0 0 12px 0;">This email was dispatched autonomously by your MRS Gravatar Concierge.</p>
-                <a href="mailto:${encodedMailtoEmail}?subject=Re:%20Portfolio%20Inquiry%20-%20MRS" style="display: inline-block; background: #1D8FF2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 18px; border-radius: 6px;">Reply Directly to ${safeHtmlName}</a>
+                <a href="${safeReplySubjectHref}" style="display: inline-block; background: #1D8FF2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 18px; border-radius: 6px;">Reply Directly to ${safeHtmlName}</a>
               </div>
             </div>
           `,
@@ -3332,12 +3341,13 @@ app.post("/api/inquiries", async (req, res) => {
       console.log(`[Gmail SMTP] Transporter not initialized (GMAIL_APP_PASSWORD pending). Direct routing acknowledgment for ${destinationEmail}`);
     }
 
-    const encodedSubject = encodeURIComponent(`Portfolio Inquiry from ${senderName}`);
-    const encodedBody = encodeURIComponent(
-      `Hello M R S,\n\nSender: ${senderName}\nEmail: ${senderEmail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${senderNote}\n\n--\nSent via M R S Interactive Portfolio`
-    );
-    const directGmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${destinationEmail}&su=${encodedSubject}&body=${encodedBody}`;
-    const mailtoUrl = `mailto:${destinationEmail}?subject=${encodedSubject}&body=${encodedBody}`;
+    const inquirySubject = `Portfolio Inquiry from ${senderName}`;
+    const inquiryBody = `Hello M R S,\n\nSender: ${senderName}\nEmail: ${senderEmail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${senderNote}\n\n--\nSent via M R S Interactive Portfolio`;
+    const directGmailUrl = safeGmailComposeHref(destinationEmail, inquirySubject, inquiryBody);
+    const mailtoUrl = safeMailtoHref(destinationEmail, {
+      subject: inquirySubject,
+      body: inquiryBody,
+    });
 
     // Persist inquiry for the all-in-one monthly executive report
     try {
@@ -4807,11 +4817,8 @@ async function startServer() {
     const reqPath = req.path && req.path !== "/" ? req.path.replace(/\/+$/, "") : "/";
     const canonicalUrl = escapeHtml(`${baseOrigin}${reqPath === "/" ? "/" : reqPath}`);
     const imageAbsUrl = escapeHtml(`${baseOrigin}/mrs_profile_avatar.jpg`);
-    const websiteJsonUrl = `${baseOrigin}/`.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/</g, "\\u003c");
-    const jsonImageAbsUrl = `${baseOrigin}/mrs_profile_avatar.jpg`
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"')
-      .replace(/</g, "\\u003c");
+    const websiteJsonUrl = escapeJsonLdString(`${baseOrigin}/`);
+    const jsonImageAbsUrl = escapeJsonLdString(`${baseOrigin}/mrs_profile_avatar.jpg`);
 
     return rawHtml
       .replace(
@@ -4825,6 +4832,10 @@ async function startServer() {
       .replace(
         /<meta id="og-image-meta" property="og:image" content="[^"]*"\s*\/?>/i,
         `<meta id="og-image-meta" property="og:image" content="${imageAbsUrl}" />`
+      )
+      .replace(
+        /<meta id="og-image-secure-meta" property="og:image:secure_url" content="[^"]*"\s*\/?>/i,
+        `<meta id="og-image-secure-meta" property="og:image:secure_url" content="${imageAbsUrl}" />`
       )
       .replace(
         /<meta id="twitter-url-meta" name="twitter:url" content="[^"]*"\s*\/?>/i,
@@ -4841,6 +4852,10 @@ async function startServer() {
       .replace(
         /"url":\s*"\/mrs_profile_avatar\.jpg"/g,
         `"url": "${jsonImageAbsUrl}"`
+      )
+      .replace(
+        /"contentUrl":\s*"\/mrs_profile_avatar\.jpg"/g,
+        `"contentUrl": "${jsonImageAbsUrl}"`
       )
       .replace(
         /"image":\s*"\/mrs_profile_avatar\.jpg"/g,

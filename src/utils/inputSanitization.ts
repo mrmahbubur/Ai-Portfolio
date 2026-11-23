@@ -11,7 +11,7 @@ export const INPUT_LIMITS = {
   PASSWORD_MAX: 128,
 } as const;
 
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_PATTERN = /^[^\s@<>'"/?&=\\]+@[^\s@<>'"/?&=\\]+\.[^\s@<>'"/?&=\\]{2,}$/;
 
 const CONTROL_CHARS_INLINE = /[\u0000-\u001F\u007F]/g;
 const CONTROL_CHARS_MULTILINE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
@@ -73,16 +73,41 @@ export function isValidEmailAddress(email: string): boolean {
 }
 
 /**
- * Validates external anchor hrefs to strictly permit http/https/mailto protocols.
+ * Validates external anchor hrefs to strictly permit http/https (and sanitized mailto: when enabled).
  */
 export function sanitizeSafeHref(url?: string, allowMailto = false): string | undefined {
   if (!url || typeof url !== 'string') return undefined;
   const trimmed = url.trim();
   if (!trimmed) return undefined;
 
-  if (allowMailto && trimmed.toLowerCase().startsWith('mailto:')) {
-    const addr = sanitizeEmailInput(trimmed.slice(7));
-    return isValidEmailAddress(addr) ? `mailto:${addr}` : undefined;
+  if (allowMailto && /^mailto:/i.test(trimmed)) {
+    const withoutScheme = trimmed.slice(7);
+    const qIdx = withoutScheme.indexOf('?');
+    const rawAddr = qIdx >= 0 ? withoutScheme.slice(0, qIdx) : withoutScheme;
+    const rawQuery = qIdx >= 0 ? withoutScheme.slice(qIdx + 1) : '';
+
+    let decodedAddr = rawAddr;
+    try {
+      decodedAddr = decodeURIComponent(rawAddr);
+    } catch {}
+
+    const cleanAddr = sanitizeEmailInput(decodedAddr, INPUT_LIMITS.EMAIL_MAX);
+    if (!isValidEmailAddress(cleanAddr)) return undefined;
+
+    if (!rawQuery) {
+      return `mailto:${encodeURIComponent(cleanAddr)}`;
+    }
+
+    try {
+      const params = new URLSearchParams(rawQuery);
+      return sanitizeMailtoHref(
+        cleanAddr,
+        params.get('subject') || undefined,
+        params.get('body') || undefined
+      );
+    } catch {
+      return `mailto:${encodeURIComponent(cleanAddr)}`;
+    }
   }
 
   try {
@@ -114,14 +139,68 @@ export function sanitizeMailtoHref(
   fallbackEmail = 'mr216873@gmail.com'
 ): string {
   const cleanEmail = sanitizeEmailInput(email || '', INPUT_LIMITS.EMAIL_MAX);
-  const safeRecipient = isValidEmailAddress(cleanEmail) ? cleanEmail : fallbackEmail;
+  const safeRecipient = isValidEmailAddress(cleanEmail)
+    ? cleanEmail
+    : isValidEmailAddress(fallbackEmail)
+      ? sanitizeEmailInput(fallbackEmail, INPUT_LIMITS.EMAIL_MAX)
+      : 'mr216873@gmail.com';
   const params: string[] = [];
   if (subject) {
-    params.push(`subject=${encodeURIComponent(sanitizeSingleLineText(subject, INPUT_LIMITS.SUBJECT_MAX))}`);
+    const cleanSub = sanitizeSingleLineText(subject, INPUT_LIMITS.SUBJECT_MAX);
+    if (cleanSub) params.push(`subject=${encodeURIComponent(cleanSub)}`);
   }
   if (body) {
-    params.push(`body=${encodeURIComponent(sanitizeMultilineText(body, INPUT_LIMITS.MESSAGE_MAX))}`);
+    const cleanBody = sanitizeMultilineText(body, INPUT_LIMITS.MESSAGE_MAX);
+    if (cleanBody) params.push(`body=${encodeURIComponent(cleanBody)}`);
   }
   return `mailto:${encodeURIComponent(safeRecipient)}${params.length ? `?${params.join('&')}` : ''}`;
+}
+
+/**
+ * Builds or validates a safe HTTPS Gmail Web compose link.
+ */
+export function sanitizeGmailComposeHref(options: {
+  url?: string;
+  to?: string;
+  subject?: string;
+  body?: string;
+  fallbackTo?: string;
+}): string {
+  const fallbackRecipient = isValidEmailAddress(options.fallbackTo || '')
+    ? sanitizeEmailInput(options.fallbackTo, INPUT_LIMITS.EMAIL_MAX)
+    : 'mr216873@gmail.com';
+
+  let recipient = isValidEmailAddress(options.to || '')
+    ? sanitizeEmailInput(options.to, INPUT_LIMITS.EMAIL_MAX)
+    : fallbackRecipient;
+  let subjectText = options.subject ? sanitizeSingleLineText(options.subject, INPUT_LIMITS.SUBJECT_MAX) : '';
+  let bodyText = options.body ? sanitizeMultilineText(options.body, INPUT_LIMITS.MESSAGE_MAX) : '';
+
+  if (options.url) {
+    try {
+      const parsed = new URL(options.url);
+      if (parsed.protocol === 'https:' && parsed.hostname === 'mail.google.com') {
+        const paramTo = parsed.searchParams.get('to');
+        const paramSu = parsed.searchParams.get('su');
+        const paramBody = parsed.searchParams.get('body');
+        if (paramTo && isValidEmailAddress(paramTo)) {
+          recipient = sanitizeEmailInput(paramTo, INPUT_LIMITS.EMAIL_MAX);
+        }
+        if (paramSu) subjectText = sanitizeSingleLineText(paramSu, INPUT_LIMITS.SUBJECT_MAX);
+        if (paramBody) bodyText = sanitizeMultilineText(paramBody, INPUT_LIMITS.MESSAGE_MAX);
+      }
+    } catch {
+      // Ignore malformed candidate and build clean URL from validated parameters
+    }
+  }
+
+  const query = new URLSearchParams({
+    view: 'cm',
+    fs: '1',
+    to: recipient,
+  });
+  if (subjectText) query.set('su', subjectText);
+  if (bodyText) query.set('body', bodyText);
+  return `https://mail.google.com/mail/?${query.toString()}`;
 }
 

@@ -1,5 +1,5 @@
 import { getAllSubscribers, cleanSiteUrl, FEATURED_PLATFORM_URL } from './subscribers';
-import { escapeHtml, safeEmailHref } from './emailSanitizer.ts';
+import { escapeHtml, safeEmailHref, safeMailtoHref } from './emailSanitizer.ts';
 
 export interface SocialSharePack {
   platform: 'linkedin' | 'x' | 'whatsapp' | 'telegram' | 'facebook' | 'reddit' | 'email';
@@ -55,12 +55,11 @@ export function generateSocialSharePacks(siteUrl?: string, projectTitle?: string
     ? `Take a look at "${projectTitle}" by M R S (Certified IT Support Professional & Web Manager): ${targetUrl}`
     : `Check out M R S's interactive portfolio with 24/7 AI Voice Concierge & verified credentials (IT Support, Remote Systems & Web Management): ${targetUrl}`;
 
-  const emailSubject = encodeURIComponent(`M R S — Certified IT Support Professional & Web Manager`);
-  const emailBody = encodeURIComponent(
+  const emailSubjectText = 'M R S — Certified IT Support Professional & Web Manager';
+  const emailBodyText =
     `Hello,\n\nI wanted to share M R S's interactive portfolio and AI concierge: ${targetUrl}\n\n` +
     `M R S is a Certified IT Support Professional and Web Manager specializing in remote administration, MS Office document systems, and digital platforms.\n\n` +
-    `Featured Hub: ${hubUrl}\nContact: mr216873@gmail.com`
-  );
+    `Featured Hub: ${hubUrl}\nContact: mr216873@gmail.com`;
 
   return [
     {
@@ -101,8 +100,12 @@ export function generateSocialSharePacks(siteUrl?: string, projectTitle?: string
     {
       platform: 'email',
       name: 'Email Referral',
-      shareUrl: `mailto:?subject=${emailSubject}&body=${emailBody}`,
-      suggestedText: decodeURIComponent(emailBody),
+      shareUrl: safeMailtoHref('', {
+        allowEmptyRecipient: true,
+        subject: emailSubjectText,
+        body: emailBodyText,
+      }),
+      suggestedText: emailBodyText,
       iconHint: 'mail',
     },
   ];

@@ -5,6 +5,7 @@ import {
   INPUT_LIMITS,
   isValidEmailAddress,
   sanitizeEmailInput,
+  sanitizeMailtoHref,
   sanitizeMultilineText,
   sanitizeSafeHref,
   sanitizeSingleLineText,
@@ -110,7 +111,7 @@ export const ConciergeContact: React.FC<ConciergeContactProps> = ({
               Direct Primary Email · Private Dispatch
             </span>
             <a
-              href={`mailto:${safeEmail}`}
+              href={sanitizeMailtoHref(safeEmail)}
               className="text-base sm:text-lg font-mono text-[var(--text)] hover:text-[var(--gold)] transition-colors break-all flex items-center gap-2"
             >
               <Mail className="w-4 h-4 text-[var(--gold)] shrink-0" />

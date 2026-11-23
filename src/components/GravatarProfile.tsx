@@ -46,6 +46,7 @@ import {
   INPUT_LIMITS,
   isValidEmailAddress,
   sanitizeEmailInput,
+  sanitizeGmailComposeHref,
   sanitizeMailtoHref,
   sanitizeMultilineText,
   sanitizePhoneHref,
@@ -233,11 +234,12 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
 
     const emailSubject = `Portfolio Inquiry from ${trimmedName}`;
     const emailBody = `Hello M R S,\n\nSender: ${trimmedName}\nEmail: ${cleanedEmail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${trimmedMessage}\n\n--\nSent via M R S Interactive Portfolio`;
-    const encodedSubject = encodeURIComponent(trimmedSubject);
-    const encodedBody = encodeURIComponent(emailBody);
-    const gmailUrl =
-      sanitizeSafeHref(result?.directGmailUrl) ||
-      `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodedSubject}&body=${encodedBody}`;
+    const gmailUrl = sanitizeGmailComposeHref({
+      url: result?.directGmailUrl,
+      to: recipientEmail,
+      subject: trimmedSubject || emailSubject,
+      body: emailBody,
+    });
     const mailtoUrl =
       sanitizeSafeHref(result?.mailtoUrl, true) ||
       sanitizeMailtoHref(recipientEmail, trimmedSubject || emailSubject, emailBody);
@@ -265,11 +267,12 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
       'Hello M R S, I would like to get in touch regarding your IT support and web management services.';
     const composeSubject = `Portfolio Inquiry from ${cleanName}`;
     const composeBody = `Hello M R S,\n\nSender: ${cleanName}\nEmail: ${cleanMail}\nDate: ${new Date().toUTCString()}\n\nMessage:\n${cleanBodyNote}\n\n--\nSent via M R S Interactive Portfolio`;
-    const encodedSubject = encodeURIComponent(composeSubject);
-    const encodedBody = encodeURIComponent(composeBody);
-    const gmailUrl =
-      sanitizeSafeHref(lastDirectUrls?.gmailUrl) ||
-      `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodedSubject}&body=${encodedBody}`;
+    const gmailUrl = sanitizeGmailComposeHref({
+      url: lastDirectUrls?.gmailUrl,
+      to: recipientEmail,
+      subject: composeSubject,
+      body: composeBody,
+    });
     const mailtoUrl =
       sanitizeSafeHref(lastDirectUrls?.mailtoUrl, true) ||
       sanitizeMailtoHref(recipientEmail, composeSubject, composeBody);

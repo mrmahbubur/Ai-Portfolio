@@ -20,7 +20,16 @@ import { getExplanationForSection } from './data/explanations';
 import { audioEngine } from './utils/audio';
 import { detectBrowserLanguage, getLanguageByCode, getLocalizedGreeting } from './utils/languages';
 import { generateIntelligentAnswer } from './utils/intelligentQA';
-import { auth, authPersistencePromise, parseStoredAuthUser, writeStoredAuthUser } from './lib/firebase';
+import {
+  auth,
+  authPersistencePromise,
+  clearStoredAuthUser,
+  isAuthStorageSyncEvent,
+  parseStoredAuthUser,
+  readStoredAuthUser,
+  writeStoredAuthUser,
+  type AuthSessionUser,
+} from './lib/firebase';
 import { formatFirebaseAuthError } from './lib/firebaseAuthErrors';
 import {
   INPUT_LIMITS,
@@ -235,19 +244,7 @@ export default function App() {
   const [isEmbedModalOpen, setIsEmbedModalOpen] = useState<boolean>(false);
 
   // Authentication & Subscriber state (supports Firebase & server-stored accounts)
-  const [currentUser, setCurrentUser] = useState<any>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('mrs_auth_user');
-        const parsed = parseStoredAuthUser(raw);
-        if (raw && !parsed) {
-          writeStoredAuthUser(null);
-        }
-        return parsed;
-      } catch {}
-    }
-    return null;
-  });
+  const [currentUser, setCurrentUser] = useState<AuthSessionUser | null>(() => readStoredAuthUser());
   const [authListenerError, setAuthListenerError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalTab, setAuthModalTab] = useState<'signin' | 'signup'>('signup');
@@ -328,7 +325,7 @@ export default function App() {
         if (!active) return;
 
         if (user) {
-          const existing = parseStoredAuthUser(localStorage.getItem('mrs_auth_user'));
+          const existing = readStoredAuthUser();
           const sameIdentity =
             existing &&
             (existing.uid === user.uid ||
@@ -346,37 +343,31 @@ export default function App() {
           };
 
           const persisted = writeStoredAuthUser(mergedSession);
-          setCurrentUser(persisted || mergedSession);
+          setCurrentUser(persisted);
           setAuthListenerError(null);
         } else {
-          try {
-            const raw = localStorage.getItem('mrs_auth_user');
-            const parsed = parseStoredAuthUser(raw);
-            if (parsed?.isServerAccount && parsed.email) {
-              setCurrentUser(parsed);
-              // Silently refresh server subscriber status to keep persisted server account current
-              fetch(`/api/subscribers/status?email=${encodeURIComponent(parsed.email)}`)
-                .then((res) => (res.ok ? res.json() : null))
-                .then((data) => {
-                  if (!active || !data?.subscriber) return;
-                  const refreshed = {
-                    ...parsed,
-                    displayName: data.subscriber.name || parsed.displayName,
-                    receivePlatformUpdates: Boolean(data.subscriber.receivePlatformUpdates),
-                    receiveBlogUpdates: Boolean(data.subscriber.receiveBlogUpdates),
-                  };
-                  const persistedRefreshed = writeStoredAuthUser(refreshed);
-                  setCurrentUser(persistedRefreshed || refreshed);
-                })
-                .catch(() => {});
-            } else {
-              if (raw) {
-                writeStoredAuthUser(null);
-              }
-              setCurrentUser(null);
-            }
-          } catch {
-            writeStoredAuthUser(null);
+          const parsed = readStoredAuthUser();
+          if (parsed?.isServerAccount && parsed.email) {
+            setCurrentUser(parsed);
+            // Silently refresh server subscriber status to keep persisted server account current
+            fetch(`/api/subscribers/status?email=${encodeURIComponent(parsed.email)}`)
+              .then((res) => (res.ok ? res.json() : null))
+              .then((data) => {
+                if (!active || !data?.subscriber) return;
+                const refreshed = {
+                  ...parsed,
+                  displayName: data.subscriber.name || parsed.displayName,
+                  receivePlatformUpdates: Boolean(data.subscriber.receivePlatformUpdates),
+                  receiveBlogUpdates: Boolean(data.subscriber.receiveBlogUpdates),
+                };
+                const persistedRefreshed = writeStoredAuthUser(refreshed);
+                if (persistedRefreshed) {
+                  setCurrentUser(persistedRefreshed);
+                }
+              })
+              .catch(() => {});
+          } else {
+            clearStoredAuthUser();
             setCurrentUser(null);
           }
         }
@@ -391,17 +382,15 @@ export default function App() {
         setAuthListenerError(formatted);
 
         // Fall back gracefully to persisted server account if available
-        try {
-          const parsed = parseStoredAuthUser(localStorage.getItem('mrs_auth_user'));
-          if (parsed?.isServerAccount) {
-            setCurrentUser(parsed);
-          }
-        } catch {}
+        const parsed = readStoredAuthUser();
+        if (parsed?.isServerAccount) {
+          setCurrentUser(parsed);
+        }
       }
     );
 
     const handleStorageSync = (e: StorageEvent) => {
-      if (e.key === 'mrs_auth_user') {
+      if (isAuthStorageSyncEvent(e)) {
         const nextUser = parseStoredAuthUser(e.newValue);
         setCurrentUser(nextUser);
       }

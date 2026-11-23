@@ -19,6 +19,7 @@ import {
 } from '../utils/inputSanitization';
 
 const VALID_UID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+export const AUTH_STORAGE_KEY = 'mrs_auth_user';
 
 export interface AuthSessionUser {
   uid: string;
@@ -89,20 +90,45 @@ export function parseStoredAuthUser(raw: string | null): AuthSessionUser | null 
   }
 }
 
+export function clearStoredAuthUser(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {}
+}
+
+export function readStoredAuthUser(): AuthSessionUser | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = parseStoredAuthUser(raw);
+    if (!parsed) {
+      clearStoredAuthUser();
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export function writeStoredAuthUser(candidate: unknown): AuthSessionUser | null {
   if (typeof window === 'undefined') return null;
   if (!candidate) {
-    try {
-      localStorage.removeItem('mrs_auth_user');
-    } catch {}
+    clearStoredAuthUser();
     return null;
   }
   const normalized = normalizeAuthSessionUser(candidate);
   if (!normalized) return null;
   try {
-    localStorage.setItem('mrs_auth_user', JSON.stringify(normalized));
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(normalized));
   } catch {}
   return normalized;
+}
+
+export function isAuthStorageSyncEvent(event: StorageEvent): boolean {
+  return event.key === AUTH_STORAGE_KEY;
 }
 
 const app = initializeApp(firebaseConfig);

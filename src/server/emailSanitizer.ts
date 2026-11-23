@@ -50,3 +50,100 @@ export function safeEmailHref(
     return fallback;
   }
 }
+
+/**
+ * Escapes strings embedded inside HTML <script type="application/ld+json"> tags to prevent
+ * JSON syntax corruption, Unicode line-separator breakage, and </script> tag breakout.
+ */
+export function escapeJsonLdString(unsafe: unknown): string {
+  return String(unsafe ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+    .replace(/[\u0000-\u001F\u007F]/g, '');
+}
+
+const SERVER_EMAIL_PATTERN = /^[^\s@<>'"/?&=\\]+@[^\s@<>'"/?&=\\]+\.[^\s@<>'"/?&=\\]{2,}$/;
+
+/**
+ * Validates and builds a sanitized mailto: URI for HTML email links and client fallback responses.
+ */
+export function safeMailtoHref(
+  email: unknown,
+  options?: {
+    subject?: unknown;
+    body?: unknown;
+    allowEmptyRecipient?: boolean;
+    fallbackEmail?: string;
+  }
+): string {
+  const fallback = options?.fallbackEmail || 'mr216873@gmail.com';
+  const cleaned = String(email ?? '')
+    .replace(/[\u0000-\u001F\u007F\s<>]/g, '')
+    .trim()
+    .slice(0, 128);
+
+  const hasValidRecipient = SERVER_EMAIL_PATTERN.test(cleaned);
+  const recipient = hasValidRecipient
+    ? cleaned
+    : options?.allowEmptyRecipient
+      ? ''
+      : fallback;
+
+  const params: string[] = [];
+  if (options?.subject !== undefined && options?.subject !== null) {
+    const sub = stripCrlf(options.subject, 200);
+    if (sub) params.push(`subject=${encodeURIComponent(sub)}`);
+  }
+  if (options?.body !== undefined && options?.body !== null) {
+    const bodyText = String(options.body)
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+      .trim()
+      .slice(0, 2000);
+    if (bodyText) params.push(`body=${encodeURIComponent(bodyText)}`);
+  }
+
+  return `mailto:${recipient ? encodeURIComponent(recipient) : ''}${params.length ? `?${params.join('&')}` : ''}`;
+}
+
+/**
+ * Builds a strictly encoded HTTPS Gmail Web compose URI.
+ */
+export function safeGmailComposeHref(
+  to: unknown,
+  subject?: unknown,
+  body?: unknown,
+  fallbackEmail = 'mr216873@gmail.com'
+): string {
+  const cleanedTo = String(to ?? '')
+    .replace(/[\u0000-\u001F\u007F\s<>]/g, '')
+    .trim()
+    .slice(0, 128);
+  const recipient = SERVER_EMAIL_PATTERN.test(cleanedTo) ? cleanedTo : fallbackEmail;
+
+  const query = new URLSearchParams({
+    view: 'cm',
+    fs: '1',
+    to: recipient,
+  });
+  if (subject !== undefined && subject !== null) {
+    const sub = stripCrlf(subject, 200);
+    if (sub) query.set('su', sub);
+  }
+  if (body !== undefined && body !== null) {
+    const bodyText = String(body)
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+      .trim()
+      .slice(0, 2000);
+    if (bodyText) query.set('body', bodyText);
+  }
+
+  return `https://mail.google.com/mail/?${query.toString()}`;
+}

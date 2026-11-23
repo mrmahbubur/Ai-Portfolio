@@ -42,6 +42,7 @@
     <meta property="og:title" content="M R S Portfolio &ndash; IT Support &amp; Web Concierge" />
     <meta property="og:description" content="Explore M R S's remote IT support, web management projects, technical writing, and interactive voice concierge. Request support or download the CV." />
     <meta id="og-image-meta" property="og:image" content="/mrs_profile_avatar.jpg" />
+    <meta id="og-image-secure-meta" property="og:image:secure_url" content="/mrs_profile_avatar.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="1200" />
@@ -68,6 +69,10 @@
           if (ogImg && ogImg.getAttribute('content') && ogImg.getAttribute('content').startsWith('/')) {
             ogImg.setAttribute('content', window.location.origin + ogImg.getAttribute('content'));
           }
+          var ogSecureImg = document.getElementById('og-image-secure-meta');
+          if (ogSecureImg && ogSecureImg.getAttribute('content') && ogSecureImg.getAttribute('content').startsWith('/')) {
+            ogSecureImg.setAttribute('content', window.location.origin + ogSecureImg.getAttribute('content'));
+          }
           var twImg = document.getElementById('twitter-image-meta');
           if (twImg && twImg.getAttribute('content') && twImg.getAttribute('content').startsWith('/')) {
             twImg.setAttribute('content', window.location.origin + twImg.getAttribute('content'));
@@ -89,18 +94,23 @@
           "publisher": { "@id": "#person" }
         },
         {
+          "@type": "ImageObject",
+          "@id": "#avatar",
+          "url": "/mrs_profile_avatar.jpg",
+          "contentUrl": "/mrs_profile_avatar.jpg",
+          "width": 1200,
+          "height": 1200,
+          "encodingFormat": "image/jpeg",
+          "caption": "M R S — Certified IT Support Professional & Web Manager"
+        },
+        {
           "@type": "ProfilePage",
           "@id": "#profilepage",
           "url": "https://ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app/",
           "name": "M R S Portfolio & Concierge",
           "isPartOf": { "@id": "#website" },
           "mainEntity": { "@id": "#person" },
-          "primaryImageOfPage": {
-            "@type": "ImageObject",
-            "url": "/mrs_profile_avatar.jpg",
-            "width": 1200,
-            "height": 1200
-          }
+          "primaryImageOfPage": { "@id": "#avatar" }
         },
         {
           "@type": "Person",
@@ -112,7 +122,7 @@
           "email": "mr216873@gmail.com",
           "telephone": "+8809611056361",
           "url": "https://gravatar.com/mrxshahin",
-          "image": "/mrs_profile_avatar.jpg",
+          "image": { "@id": "#avatar" },
           "sameAs": [
             "https://gravatar.com/mrxshahin",
             "https://www.linkedin.com/in/mrmahbubur",

@@ -762,14 +762,9 @@ export const CamelliaChatPanel: React.FC<CamelliaChatPanelProps> = ({
     }
   }, [isOpen, queuedPrompt, isGenerating, handleSend]);
 
-  // Safe URL sanitizer blocking javascript:, data:, vbscript: URIs
+  // Safe URL sanitizer blocking javascript:, data:, vbscript: and malformed mailto: URIs
   const getSafeHref = (rawUrl?: string): string | null => {
-    if (!rawUrl) return null;
-    const trimmed = rawUrl.trim();
-    if (/^(https?:\/\/|mailto:)/i.test(trimmed)) {
-      return trimmed;
-    }
-    return null;
+    return sanitizeSafeHref(rawUrl, true) || null;
   };
 
   // Block-level Markdown renderer (code blocks, tables, headings, blockquotes, lists)
