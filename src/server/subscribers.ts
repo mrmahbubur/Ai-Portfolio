@@ -254,11 +254,11 @@ export function formatProjectUpdateEmail(project: {
               Explore M R S’s premier interactive AI concierge platform, full portfolio directory, verified certifications, and live web management showcase:
             </p>
             <div>
-              <a href="${featuredPlatformUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #1E293B; border: 1px solid #E2B867; color: #F8FAFC; font-weight: 700; font-size: 12px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.06em; text-decoration: none; padding: 10px 20px; border-radius: 6px;">
+              <a href="${safeFeaturedUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #1E293B; border: 1px solid #E2B867; color: #F8FAFC; font-weight: 700; font-size: 12px; font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.06em; text-decoration: none; padding: 10px 20px; border-radius: 6px;">
                 Open Featured Platform: mrxshahin.ai.studio ↗
               </a>
               <div style="margin-top: 8px; font-family: ui-monospace, monospace; font-size: 11px; color: #94A3B8;">
-                Direct Hub URL: <a href="${featuredPlatformUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: underline; word-break: break-all;">${featuredPlatformUrl}</a>
+                Direct Hub URL: <a href="${safeFeaturedUrl}" target="_blank" rel="noopener noreferrer" style="color: #E2B867; text-decoration: underline; word-break: break-all;">${safeFeaturedUrl}</a>
               </div>
             </div>
           </div>
@@ -500,7 +500,7 @@ export async function dispatchUpdateNotificationToSubscribers(
         await transporter.sendMail({
           from: `"Camellia (M R S Assistant)" <${gmailUser}>`,
           to: sub.email,
-          subject: emailContent.subject,
+          subject: sanitizeEmailSubject(emailContent.subject),
           text: emailContent.text,
           html: emailContent.html,
         });

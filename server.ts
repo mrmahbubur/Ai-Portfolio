@@ -4833,6 +4833,10 @@ async function startServer() {
       .replace(
         /"url":\s*"https:\/\/ais-pre-kvr65sziiqaqoqlwvajinm-369506879239\.asia-southeast1\.run\.app\/"/g,
         `"url": "${websiteJsonUrl}"`
+      )
+      .replace(
+        /"image":\s*"\/mrs_profile_avatar\.jpg"/g,
+        `"image": "${escapeHtml(`${baseOrigin}/mrs_profile_avatar.jpg`).replace(/"/g, '\\"')}"`
       );
   };
 
@@ -4841,6 +4845,7 @@ async function startServer() {
       server: {
         middlewareMode: true,
         hmr: false,
+        ws: false,
         watch: null,
       },
       appType: "spa",
@@ -4892,9 +4897,11 @@ async function startServer() {
         liveWss.handleUpgrade(req, socket, head, (ws) => {
           liveWss.emit("connection", ws, req);
         });
+      } else {
+        socket.destroy();
       }
     } catch {
-      // Allow Vite HMR and other WebSocket upgrades to pass cleanly
+      socket.destroy();
     }
   });
 

@@ -20,8 +20,16 @@ import { getExplanationForSection } from './data/explanations';
 import { audioEngine } from './utils/audio';
 import { detectBrowserLanguage, getLanguageByCode, getLocalizedGreeting } from './utils/languages';
 import { generateIntelligentAnswer } from './utils/intelligentQA';
-import { auth } from './lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth, authPersistencePromise, parseStoredAuthUser } from './lib/firebase';
+import { formatFirebaseAuthError } from './lib/firebaseAuthErrors';
+import {
+  INPUT_LIMITS,
+  isValidEmailAddress,
+  sanitizeEmailInput,
+  sanitizeMultilineText,
+  sanitizeSingleLineText,
+} from './utils/inputSanitization';
+import { onAuthStateChanged } from 'firebase/auth';
 
 // Lazy-load upgraded interactive AI panels so initial page load stays instantaneous
 const CamelliaChatPanel = React.lazy(() =>
@@ -230,12 +238,17 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('mrs_auth_user');
-        if (saved) return JSON.parse(saved);
-      } catch (e) {}
+        const raw = localStorage.getItem('mrs_auth_user');
+        const parsed = parseStoredAuthUser(raw);
+        if (raw && !parsed) {
+          localStorage.removeItem('mrs_auth_user');
+        }
+        return parsed;
+      } catch {}
     }
     return null;
   });
+  const [authListenerError, setAuthListenerError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalTab, setAuthModalTab] = useState<'signin' | 'signup'>('signup');
 
@@ -293,41 +306,119 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    authPersistencePromise
+      .then((res) => {
+        if (active && res.error) {
+          setAuthListenerError(res.error);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setAuthListenerError(
+            formatFirebaseAuthError(err, 'Unable to initialize authentication persistence.')
+          );
+        }
+      });
+
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
+        if (!active) return;
+
         if (user) {
-          setCurrentUser(user);
+          const existing = parseStoredAuthUser(localStorage.getItem('mrs_auth_user'));
+          const sameIdentity =
+            existing &&
+            (existing.uid === user.uid ||
+              (existing.email && user.email && existing.email.toLowerCase() === user.email.toLowerCase()));
+
+          const mergedSession = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || (sameIdentity ? existing?.displayName : null) || null,
+            photoURL: user.photoURL || null,
+            emailVerified: Boolean(user.emailVerified),
+            receivePlatformUpdates: sameIdentity ? existing?.receivePlatformUpdates : undefined,
+            receiveBlogUpdates: sameIdentity ? existing?.receiveBlogUpdates : undefined,
+            isServerAccount: false,
+          };
+
+          setCurrentUser(mergedSession);
+          setAuthListenerError(null);
           try {
-            localStorage.setItem(
-              'mrs_auth_user',
-              JSON.stringify({
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName,
-                photoURL: user.photoURL,
-                emailVerified: user.emailVerified,
-              })
-            );
+            localStorage.setItem('mrs_auth_user', JSON.stringify(mergedSession));
           } catch {}
         } else {
           try {
             const raw = localStorage.getItem('mrs_auth_user');
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (!parsed?.isServerAccount) {
+            const parsed = parseStoredAuthUser(raw);
+            if (parsed?.isServerAccount && parsed.email) {
+              setCurrentUser(parsed);
+              // Silently refresh server subscriber status to keep persisted server account current
+              fetch(`/api/subscribers/status?email=${encodeURIComponent(parsed.email)}`)
+                .then((res) => (res.ok ? res.json() : null))
+                .then((data) => {
+                  if (!active || !data?.subscriber) return;
+                  const refreshed = {
+                    ...parsed,
+                    displayName: data.subscriber.name || parsed.displayName,
+                    receivePlatformUpdates: Boolean(data.subscriber.receivePlatformUpdates),
+                    receiveBlogUpdates: Boolean(data.subscriber.receiveBlogUpdates),
+                  };
+                  setCurrentUser(refreshed);
+                  try {
+                    localStorage.setItem('mrs_auth_user', JSON.stringify(refreshed));
+                  } catch {}
+                })
+                .catch(() => {});
+            } else {
+              if (raw) {
                 localStorage.removeItem('mrs_auth_user');
-                setCurrentUser(null);
               }
+              setCurrentUser(null);
             }
-          } catch {}
+          } catch {
+            try {
+              localStorage.removeItem('mrs_auth_user');
+            } catch {}
+            setCurrentUser(null);
+          }
         }
       },
       (authErr) => {
+        if (!active) return;
+        const formatted = formatFirebaseAuthError(
+          authErr,
+          'Firebase authentication session check encountered an error.'
+        );
         console.warn('Firebase authentication listener error:', authErr);
+        setAuthListenerError(formatted);
+
+        // Fall back gracefully to persisted server account if available
+        try {
+          const parsed = parseStoredAuthUser(localStorage.getItem('mrs_auth_user'));
+          if (parsed?.isServerAccount) {
+            setCurrentUser(parsed);
+          }
+        } catch {}
       }
     );
-    return () => unsubscribe();
+
+    const handleStorageSync = (e: StorageEvent) => {
+      if (e.key === 'mrs_auth_user') {
+        const nextUser = parseStoredAuthUser(e.newValue);
+        setCurrentUser(nextUser);
+      }
+    };
+    window.addEventListener('storage', handleStorageSync);
+
+    return () => {
+      active = false;
+      unsubscribe();
+      window.removeEventListener('storage', handleStorageSync);
+    };
   }, []);
 
   // Live Gravatar Sync State
@@ -763,35 +854,70 @@ export default function App() {
 
   // Direct Inquiry Handling - Sent directly to mr216873@gmail.com via Gmail SMTP with zero persistence
   const handleSendInquiry = async (name: string, email: string, note: string) => {
+    const cleanName = sanitizeSingleLineText(name, INPUT_LIMITS.NAME_MAX);
+    const cleanEmailRaw = sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
+    const cleanNote = sanitizeMultilineText(note, INPUT_LIMITS.MESSAGE_MAX);
+
+    if (!cleanName || !cleanNote) {
+      return {
+        success: false,
+        smtpDelivered: false,
+        error: 'Please provide both your name and message before sending.',
+      };
+    }
+
+    if (
+      cleanEmailRaw &&
+      cleanEmailRaw !== 'guest@portfolio.com' &&
+      !isValidEmailAddress(cleanEmailRaw)
+    ) {
+      return {
+        success: false,
+        smtpDelivered: false,
+        error: 'Please enter a valid email address.',
+      };
+    }
+
+    const cleanEmail = cleanEmailRaw || 'guest@portfolio.com';
     let smtpDelivered = false;
     let directGmailUrl = '';
     let mailtoUrl = '';
     let errorMessage = '';
+    let requestSucceeded = false;
 
     try {
       const res = await fetch('/api/inquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, note }),
+        body: JSON.stringify({ name: cleanName, email: cleanEmail, note: cleanNote }),
       });
       if (res.ok) {
         const data = await res.json();
+        requestSucceeded = true;
         smtpDelivered = Boolean(data.smtpDelivered);
         directGmailUrl = data.directGmailUrl || '';
         mailtoUrl = data.mailtoUrl || '';
       } else {
         const errData = await res.json().catch(() => ({}));
-        errorMessage = errData.error || 'Failed to dispatch';
+        errorMessage = errData.error || 'Failed to dispatch inquiry.';
       }
     } catch (err: any) {
       console.warn('Inquiry dispatch error:', err);
-      errorMessage = err?.message || 'Network error';
+      errorMessage = err?.message || 'Network error while sending inquiry.';
+    }
+
+    if (!requestSucceeded) {
+      return {
+        success: false,
+        smtpDelivered: false,
+        error: errorMessage || 'Unable to process inquiry.',
+      };
     }
 
     const recipient = profile.socials?.email || 'mr216873@gmail.com';
     const ackText = smtpDelivered
-      ? `Thank you, ${name}. Your message has been transmitted directly to M R S's Gmail inbox at ${recipient} via Gmail SMTP.`
-      : `Thank you, ${name}. Your message is prepared for M R S at ${recipient}. You can send it directly via Gmail Web or your email app.`;
+      ? `Thank you, ${cleanName}. Your message has been transmitted directly to M R S's Gmail inbox at ${recipient} via Gmail SMTP.`
+      : `Thank you, ${cleanName}. Your message is prepared for M R S at ${recipient}. You can send it directly via Gmail Web or your email app.`;
 
     const inqMsg: Message = {
       id: `msg-${Date.now()}-inq`,
@@ -986,6 +1112,33 @@ export default function App() {
         </div>
       )}
 
+      {/* Auth Listener / Persistence Recovery Notice */}
+      {authListenerError && !isAuthModalOpen && (
+        <div
+          role="alert"
+          className="w-full bg-amber-500/15 text-[var(--text)] px-4 py-2 text-center text-xs font-mono z-50 flex flex-wrap items-center justify-center gap-3"
+        >
+          <span>{authListenerError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthModalTab('signin');
+              setIsAuthModalOpen(true);
+            }}
+            className="underline text-[var(--gold)] hover:text-[var(--gold-hover)] cursor-pointer font-semibold"
+          >
+            Account Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthListenerError(null)}
+            className="text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Toast Notice for Gravatar Live Sync */}
       {gravatarSyncNotice && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-[var(--panel-raised)]/95 backdrop-blur-md text-[var(--gold)] font-mono text-xs shadow-xl flex items-center gap-2 animate-fadeIn">
@@ -1131,7 +1284,12 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         initialTab={authModalTab}
         currentUser={currentUser}
-        onUserChanged={(user) => setCurrentUser(user)}
+        authError={authListenerError}
+        onClearAuthError={() => setAuthListenerError(null)}
+        onUserChanged={(user) => {
+          setCurrentUser(user);
+          if (user) setAuthListenerError(null);
+        }}
         onAnnounce={(text) => speakText(text)}
       />
 

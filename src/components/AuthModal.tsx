@@ -52,6 +52,8 @@ interface AuthModalProps {
   onClose: () => void;
   initialTab?: 'signin' | 'signup' | 'preview';
   currentUser: any;
+  authError?: string | null;
+  onClearAuthError?: () => void;
   onUserChanged?: (user: any) => void;
   onAnnounce?: (text: string) => void;
 }
@@ -61,6 +63,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   initialTab = 'signup',
   currentUser,
+  authError,
+  onClearAuthError,
   onUserChanged,
   onAnnounce,
 }) => {
@@ -102,7 +106,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setTab(initialTab);
-      setErrorMsg(null);
+      setErrorMsg(authError || null);
       setSuccessMsg(null);
       setTestEmailStatus('idle');
       setPassword('');
@@ -115,9 +119,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (currentUser?.email) {
         setEmail(currentUser.email);
         setDisplayName(currentUser.displayName || '');
+        if (currentUser.receivePlatformUpdates !== undefined) {
+          setReceivePlatformUpdates(Boolean(currentUser.receivePlatformUpdates));
+        }
+        if (currentUser.receiveBlogUpdates !== undefined) {
+          setReceiveBlogUpdates(Boolean(currentUser.receiveBlogUpdates));
+        }
 
         const fetchPreferences = async () => {
-          if (!auth.currentUser || auth.currentUser.uid !== currentUser.uid) return;
+          if (!auth.currentUser || auth.currentUser.uid !== currentUser.uid) {
+            // Hydrate server-backed account preferences from subscriber endpoint
+            try {
+              const statusRes = await fetch(
+                `/api/subscribers/status?email=${encodeURIComponent(currentUser.email)}`
+              );
+              const statusData = await statusRes.json().catch(() => null);
+              if (statusData?.subscriber) {
+                setReceivePlatformUpdates(Boolean(statusData.subscriber.receivePlatformUpdates));
+                setReceiveBlogUpdates(Boolean(statusData.subscriber.receiveBlogUpdates));
+                if (statusData.subscriber.name && !currentUser.displayName) {
+                  setDisplayName(statusData.subscriber.name);
+                }
+              }
+            } catch {}
+            return;
+          }
           const userPath = `users/${currentUser.uid}`;
           try {
             const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
@@ -143,7 +169,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         fetchPreferences();
       }
     }
-  }, [isOpen, initialTab, currentUser]);
+  }, [isOpen, initialTab, currentUser, authError]);
 
   const loadEmailPreview = async () => {
     setIsLoadingPreview(true);
@@ -286,6 +312,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    onClearAuthError?.();
     setSuccessMsg(null);
     setIsLoading(true);
 
@@ -467,7 +494,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           body: JSON.stringify({
             email: cleanEmail,
             password,
-            displayName: displayName.trim() || undefined,
+            displayName: sanitizedName || undefined,
             receivePlatformUpdates,
             receiveBlogUpdates,
             siteUrl: typeof window !== 'undefined' ? window.location.origin : undefined,
@@ -494,7 +521,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const activeUser = {
         uid: firebaseUser?.uid || serverUser?.uid || `user-${Date.now()}`,
         email: firebaseUser?.email || serverUser?.email || cleanEmail,
-        displayName: displayName.trim() || firebaseUser?.displayName || serverUser?.displayName || null,
+        displayName: sanitizedName || firebaseUser?.displayName || serverUser?.displayName || null,
         photoURL: firebaseUser?.photoURL || null,
         emailVerified: Boolean(firebaseUser?.emailVerified || false),
         receivePlatformUpdates,

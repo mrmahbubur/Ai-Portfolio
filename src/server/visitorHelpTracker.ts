@@ -648,7 +648,7 @@ Direct recipient: mr216873@gmail.com
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>M R S Monthly Report - ${monthName}</title>
+  <title>M R S Monthly Report - ${escapeHtml(monthName)}</title>
 </head>
 <body style="margin:0;padding:24px;background-color:#0B0F19;font-family:'Segoe UI',Roboto,-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;color:#F8FAFC;">
   <div style="max-width:720px;margin:0 auto;background-color:#131B2E;border:1px solid #E2B867;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.6);">
@@ -662,7 +662,7 @@ Direct recipient: mr216873@gmail.com
             M R S &bull; All-in-One Monthly Intelligence &amp; Help Report
           </h1>
           <p style="margin:5px 0 0 0;font-size:12px;color:#E2B867;font-family:monospace;text-transform:uppercase;letter-spacing:0.1em;">
-            Period: ${monthName} &bull; Dispatched Once Monthly to ${OWNER_EMAIL}
+            Period: ${escapeHtml(monthName)} &bull; Dispatched Once Monthly to ${escapeHtml(OWNER_EMAIL)}
           </p>
         </div>
       </div>
@@ -678,7 +678,7 @@ Direct recipient: mr216873@gmail.com
         <div style="padding:14px;border-radius:10px;background-color:#131B2E;border:1px solid rgba(226,184,103,0.25);">
           <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;font-family:monospace;">Visitors Helped</div>
           <div style="font-size:24px;font-weight:700;color:#E2B867;margin-top:2px;">${totalHelp}</div>
-          <div style="font-size:10px;color:#64748B;font-family:monospace;margin-top:2px;">MRS-AID-${currentCounter}</div>
+          <div style="font-size:10px;color:#64748B;font-family:monospace;margin-top:2px;">MRS-AID-${escapeHtml(currentCounter)}</div>
         </div>
 
         <div style="padding:14px;border-radius:10px;background-color:#131B2E;border:1px solid rgba(16,185,129,0.3);">
@@ -896,7 +896,7 @@ Direct recipient: mr216873@gmail.com
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:#94A3B8;font-family:monospace;">
         <div>⚡ Autonomous Gravatar Sync: <strong style="color:#10B981;">Active (24/7)</strong></div>
         <div>🌐 Remote Bridge: <strong style="color:#60A5FA;">Connected</strong></div>
-        <div>⚖️ Governance: <strong style="color:#E2B867;">${policies.legalYear || 2026}</strong></div>
+        <div>⚖️ Governance: <strong style="color:#E2B867;">${escapeHtml(policies.legalYear || 2026)}</strong></div>
       </div>
     </div>
 
@@ -910,7 +910,7 @@ Direct recipient: mr216873@gmail.com
 `;
 
   return {
-    subject: `[M R S Operations Report] All-in-One Monthly Intelligence (${monthName})`,
+    subject: `[M R S Operations Report] All-in-One Monthly Intelligence (${String(monthName).replace(/[\r\n]+/g, ' ')})`,
     text: textReport,
     html: htmlReport,
     totalRecords: totalHelp,

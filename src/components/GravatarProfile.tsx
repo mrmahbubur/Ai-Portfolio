@@ -47,6 +47,7 @@ import {
   isValidEmailAddress,
   sanitizeEmailInput,
   sanitizeMultilineText,
+  sanitizeSafeHref,
   sanitizeSingleLineText,
 } from '../utils/inputSanitization';
 
@@ -174,7 +175,9 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
     setTimeout(() => setCopiedWalletIndex(null), 2000);
   };
 
-  const recipientEmail = profile.socials?.email || 'mr216873@gmail.com';
+  const recipientEmail = isValidEmailAddress(profile.socials?.email || '')
+    ? sanitizeEmailInput(profile.socials?.email)
+    : 'mr216873@gmail.com';
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,6 +208,11 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
     );
 
     const result = await onSendInquiry(trimmedName, cleanedEmail, trimmedMessage);
+    if (result && result.success === false) {
+      setInquiryStatus('idle');
+      setInquiryError(result.error || 'Unable to process your inquiry. Please verify your inputs.');
+      return;
+    }
 
     try {
       await addDoc(collection(db, 'inquiries'), {
@@ -448,7 +456,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
               </a>
 
               <a
-                href={profile.socials?.calendlyUrl || 'https://calendly.com/mrxshahin'}
+                href={sanitizeSafeHref(profile.socials?.calendlyUrl) || 'https://calendly.com/mrxshahin'}
                 target="_blank"
                 rel="noopener noreferrer"
                 data-allow-navigation="true"
@@ -1817,7 +1825,7 @@ export const GravatarProfile: React.FC<GravatarProfileProps> = ({
                 </p>
               </div>
               <a
-                href={profile.socials.calendlyUrl || 'https://calendly.com/mrxshahin'}
+                href={sanitizeSafeHref(profile.socials.calendlyUrl) || 'https://calendly.com/mrxshahin'}
                 target="_blank"
                 rel="noopener noreferrer"
                 data-allow-navigation="true"
