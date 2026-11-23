@@ -16,9 +16,12 @@ import {
   Code,
 } from 'lucide-react';
 
+import { type AuthSessionUser } from '../lib/firebase';
+import { sanitizeMailtoHref, sanitizeSafeHref } from '../utils/inputSanitization';
+
 interface EmailUpdatePreviewProps {
   onBack: () => void;
-  currentUser?: any;
+  currentUser?: AuthSessionUser | null;
   onSendTestEmail?: () => void;
   testEmailStatus?: 'idle' | 'sending' | 'sent' | 'error';
 }
@@ -382,7 +385,7 @@ export const EmailUpdatePreview: React.FC<EmailUpdatePreviewProps> = ({
                       Explore M R S’s interactive AI concierge platform, full portfolio directory, remote IT services, and live web management showcase:
                     </p>
                     <a
-                      href="https://mrxshahin.ai.studio/"
+                      href={sanitizeSafeHref('https://mrxshahin.ai.studio/') || 'https://mrxshahin.ai.studio/'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#0B0F19] border border-[#E2B867]/60 text-[#E2B867] text-[11px] font-mono font-bold hover:underline"
@@ -400,7 +403,7 @@ export const EmailUpdatePreview: React.FC<EmailUpdatePreviewProps> = ({
                   {/* Email Footer */}
                   <div className="pt-3 border-t border-[#1E293B] text-[10px] text-[#64748B] space-y-1">
                     <div>Sent with care by <strong>Camellia (M R S Assistant)</strong> • IT Support &amp; Remote Ops Guide</div>
-                    <div>Direct Contact: <a href="mailto:mr216873@gmail.com" className="text-[#E2B867] underline">mr216873@gmail.com</a></div>
+                    <div>Direct Contact: <a href={sanitizeMailtoHref('mr216873@gmail.com')} className="text-[#E2B867] underline">mr216873@gmail.com</a></div>
                     <div>You are receiving this because you subscribed on M R S Portfolio. <span className="underline text-[#94A3B8] cursor-pointer">Unsubscribe</span></div>
                   </div>
                 </div>

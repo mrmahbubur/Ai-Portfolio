@@ -25,6 +25,7 @@ import {
   authPersistencePromise,
   clearStoredAuthUser,
   isAuthStorageSyncEvent,
+  normalizeAuthSessionUser,
   parseStoredAuthUser,
   readStoredAuthUser,
   writeStoredAuthUser,
@@ -249,6 +250,36 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalTab, setAuthModalTab] = useState<'signin' | 'signup'>('signup');
 
+  const applyAuthSessionUser = useCallback(
+    (candidate: unknown, options: { persist?: boolean } = {}): AuthSessionUser | null => {
+      const shouldPersist = options.persist !== false;
+      if (!candidate) {
+        if (shouldPersist) {
+          clearStoredAuthUser();
+        }
+        setCurrentUser(null);
+        return null;
+      }
+
+      const nextUser = shouldPersist
+        ? writeStoredAuthUser(candidate)
+        : normalizeAuthSessionUser(candidate);
+
+      if (!nextUser) {
+        if (shouldPersist) {
+          clearStoredAuthUser();
+        }
+        setCurrentUser(null);
+        return null;
+      }
+
+      setCurrentUser(nextUser);
+      setAuthListenerError(null);
+      return nextUser;
+    },
+    []
+  );
+
   // Real browser connectivity tracking for offline resilience notice
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -342,13 +373,11 @@ export default function App() {
             isServerAccount: false,
           };
 
-          const persisted = writeStoredAuthUser(mergedSession);
-          setCurrentUser(persisted);
-          setAuthListenerError(null);
+          applyAuthSessionUser(mergedSession);
         } else {
           const parsed = readStoredAuthUser();
           if (parsed?.isServerAccount && parsed.email) {
-            setCurrentUser(parsed);
+            applyAuthSessionUser(parsed, { persist: false });
             // Silently refresh server subscriber status to keep persisted server account current
             fetch(`/api/subscribers/status?email=${encodeURIComponent(parsed.email)}`)
               .then((res) => (res.ok ? res.json() : null))
@@ -360,15 +389,11 @@ export default function App() {
                   receivePlatformUpdates: Boolean(data.subscriber.receivePlatformUpdates),
                   receiveBlogUpdates: Boolean(data.subscriber.receiveBlogUpdates),
                 };
-                const persistedRefreshed = writeStoredAuthUser(refreshed);
-                if (persistedRefreshed) {
-                  setCurrentUser(persistedRefreshed);
-                }
+                applyAuthSessionUser(refreshed);
               })
               .catch(() => {});
           } else {
-            clearStoredAuthUser();
-            setCurrentUser(null);
+            applyAuthSessionUser(null);
           }
         }
       },
@@ -384,7 +409,7 @@ export default function App() {
         // Fall back gracefully to persisted server account if available
         const parsed = readStoredAuthUser();
         if (parsed?.isServerAccount) {
-          setCurrentUser(parsed);
+          applyAuthSessionUser(parsed, { persist: false });
         }
       }
     );
@@ -392,7 +417,7 @@ export default function App() {
     const handleStorageSync = (e: StorageEvent) => {
       if (isAuthStorageSyncEvent(e)) {
         const nextUser = parseStoredAuthUser(e.newValue);
-        setCurrentUser(nextUser);
+        applyAuthSessionUser(nextUser, { persist: false });
       }
     };
     window.addEventListener('storage', handleStorageSync);
@@ -402,7 +427,7 @@ export default function App() {
       unsubscribe();
       window.removeEventListener('storage', handleStorageSync);
     };
-  }, []);
+  }, [applyAuthSessionUser]);
 
   // Live Gravatar Sync State
   const [isSyncingGravatar, setIsSyncingGravatar] = useState<boolean>(false);
@@ -1269,10 +1294,7 @@ export default function App() {
         currentUser={currentUser}
         authError={authListenerError}
         onClearAuthError={() => setAuthListenerError(null)}
-        onUserChanged={(user) => {
-          setCurrentUser(user);
-          if (user) setAuthListenerError(null);
-        }}
+        onUserChanged={(user) => applyAuthSessionUser(user)}
         onAnnounce={(text) => speakText(text)}
       />
 

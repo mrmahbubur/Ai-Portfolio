@@ -1902,7 +1902,7 @@ Dispatched automatically from your M R S Portfolio Backend.
           ${safeLat !== null && safeLon !== null ? `
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Coordinates:</strong></td>
-            <td style="padding: 5px 0;"><a href="${escapeHtml(mapLink)}" target="_blank" rel="noopener noreferrer" style="color: #38BDF8; text-decoration: underline;">${safeLat}, ${safeLon} (Open on Google Maps)</a></td>
+            <td style="padding: 5px 0;"><a href="${escapeHtml(safeEmailHref(mapLink, "https://maps.google.com"))}" target="_blank" rel="noopener noreferrer" style="color: #38BDF8; text-decoration: underline;">${safeLat}, ${safeLon} (Open on Google Maps)</a></td>
           </tr>` : ""}
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>ISP / Carrier:</strong></td>
@@ -4801,26 +4801,42 @@ async function startServer() {
 
   const resolveRequestOrigin = (req: express.Request): string => {
     if (process.env.APP_URL) {
-      return cleanSiteUrl(process.env.APP_URL);
+      const cleanedEnvUrl = cleanSiteUrl(process.env.APP_URL);
+      try {
+        return new URL(cleanedEnvUrl).origin;
+      } catch {
+        return cleanedEnvUrl;
+      }
     }
     const rawProto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim().toLowerCase();
     const proto = rawProto === "http" ? "http" : "https";
     const rawHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
     if (/^[a-zA-Z0-9.-]+(?::[0-9]{1,5})?$/.test(rawHost)) {
-      return safeEmailHref(`${proto}://${rawHost}`);
+      try {
+        return new URL(`${proto}://${rawHost}`).origin;
+      } catch {
+        return safeEmailHref(`${proto}://${rawHost}`);
+      }
     }
     return cleanSiteUrl();
   };
 
   const injectCanonicalSeoHtml = (rawHtml: string, req: express.Request): string => {
     const baseOrigin = resolveRequestOrigin(req);
-    const reqPath = req.path && req.path !== "/" ? req.path.replace(/\/+$/, "") : "/";
-    const canonicalUrl = escapeHtml(`${baseOrigin}${reqPath === "/" ? "/" : reqPath}`);
-    const imageAbsUrl = escapeHtml(`${baseOrigin}/mrs_profile_avatar.jpg`);
-    const websiteJsonUrl = escapeJsonLdString(`${baseOrigin}/`);
-    const jsonImageAbsUrl = escapeJsonLdString(`${baseOrigin}/mrs_profile_avatar.jpg`);
+    const collapsedPath = (req.path || "/").replace(/\/{2,}/g, "/");
+    const reqPath = collapsedPath !== "/" ? collapsedPath.replace(/\/+$/, "") : "/";
+    const canonicalRaw = new URL(reqPath, baseOrigin).toString();
+    const websiteRootRaw = new URL("/", baseOrigin).toString();
+    const imageRaw = new URL("/mrs_profile_avatar.jpg", baseOrigin).toString();
+    const isHttpsOrigin = imageRaw.startsWith("https://");
 
-    return rawHtml
+    const canonicalUrl = escapeHtml(canonicalRaw);
+    const imageAbsUrl = escapeHtml(imageRaw);
+    const websiteJsonUrl = escapeJsonLdString(websiteRootRaw);
+    const canonicalJsonUrl = escapeJsonLdString(canonicalRaw);
+    const jsonImageAbsUrl = escapeJsonLdString(imageRaw);
+
+    const updatedHtml = rawHtml
       .replace(
         /<link id="canonical-link" rel="canonical" href="[^"]*"\s*\/?>/i,
         `<link id="canonical-link" rel="canonical" href="${canonicalUrl}" />`
@@ -4835,7 +4851,9 @@ async function startServer() {
       )
       .replace(
         /<meta id="og-image-secure-meta" property="og:image:secure_url" content="[^"]*"\s*\/?>/i,
-        `<meta id="og-image-secure-meta" property="og:image:secure_url" content="${imageAbsUrl}" />`
+        isHttpsOrigin
+          ? `<meta id="og-image-secure-meta" property="og:image:secure_url" content="${imageAbsUrl}" />`
+          : ""
       )
       .replace(
         /<meta id="twitter-url-meta" name="twitter:url" content="[^"]*"\s*\/?>/i,
@@ -4846,8 +4864,12 @@ async function startServer() {
         `<meta id="twitter-image-meta" name="twitter:image" content="${imageAbsUrl}" />`
       )
       .replace(
-        /"url":\s*"https:\/\/ais-pre-kvr65sziiqaqoqlwvajinm-369506879239\.asia-southeast1\.run\.app\/"/g,
-        `"url": "${websiteJsonUrl}"`
+        /("@id":\s*"#website"[\s\S]*?"url":\s*)"https:\/\/ais-pre-kvr65sziiqaqoqlwvajinm-369506879239\.asia-southeast1\.run\.app\/"/g,
+        `$1"${websiteJsonUrl}"`
+      )
+      .replace(
+        /("@id":\s*"#profilepage"[\s\S]*?"url":\s*)"https:\/\/ais-pre-kvr65sziiqaqoqlwvajinm-369506879239\.asia-southeast1\.run\.app\/"/g,
+        `$1"${canonicalJsonUrl}"`
       )
       .replace(
         /"url":\s*"\/mrs_profile_avatar\.jpg"/g,
@@ -4861,6 +4883,8 @@ async function startServer() {
         /"image":\s*"\/mrs_profile_avatar\.jpg"/g,
         `"image": "${jsonImageAbsUrl}"`
       );
+
+    return updatedHtml;
   };
 
   if (process.env.NODE_ENV !== "production") {

@@ -57,25 +57,44 @@
     <script>
       (function () {
         try {
-          var cleanPath = window.location.pathname && window.location.pathname !== '/' ? window.location.pathname.replace(/\/+$/, '') : '/';
-          var currentUrl = window.location.origin + cleanPath;
+          var origin = window.location.origin;
+          var normalizedPath = (window.location.pathname || '/').replace(/\/{2,}/g, '/');
+          var cleanPath = normalizedPath !== '/' ? normalizedPath.replace(/\/+$/, '') : '/';
+          var currentUrl = new URL(cleanPath, origin).toString();
+          var resolveAssetUrl = function (rawValue) {
+            if (!rawValue) return null;
+            var resolved = new URL(rawValue, origin);
+            if (resolved.protocol !== 'https:' && resolved.protocol !== 'http:') return null;
+            return resolved.toString();
+          };
+
           var canonical = document.getElementById('canonical-link');
           if (canonical) canonical.setAttribute('href', currentUrl);
           var ogUrl = document.getElementById('og-url-meta');
           if (ogUrl) ogUrl.setAttribute('content', currentUrl);
           var twitterUrl = document.getElementById('twitter-url-meta');
           if (twitterUrl) twitterUrl.setAttribute('content', currentUrl);
+
           var ogImg = document.getElementById('og-image-meta');
-          if (ogImg && ogImg.getAttribute('content') && ogImg.getAttribute('content').startsWith('/')) {
-            ogImg.setAttribute('content', window.location.origin + ogImg.getAttribute('content'));
+          if (ogImg) {
+            var ogImgUrl = resolveAssetUrl(ogImg.getAttribute('content'));
+            if (ogImgUrl) ogImg.setAttribute('content', ogImgUrl);
           }
+
           var ogSecureImg = document.getElementById('og-image-secure-meta');
-          if (ogSecureImg && ogSecureImg.getAttribute('content') && ogSecureImg.getAttribute('content').startsWith('/')) {
-            ogSecureImg.setAttribute('content', window.location.origin + ogSecureImg.getAttribute('content'));
+          if (ogSecureImg) {
+            var ogSecureUrl = resolveAssetUrl(ogSecureImg.getAttribute('content'));
+            if (ogSecureUrl && ogSecureUrl.indexOf('https://') === 0) {
+              ogSecureImg.setAttribute('content', ogSecureUrl);
+            } else {
+              ogSecureImg.remove();
+            }
           }
+
           var twImg = document.getElementById('twitter-image-meta');
-          if (twImg && twImg.getAttribute('content') && twImg.getAttribute('content').startsWith('/')) {
-            twImg.setAttribute('content', window.location.origin + twImg.getAttribute('content'));
+          if (twImg) {
+            var twImgUrl = resolveAssetUrl(twImg.getAttribute('content'));
+            if (twImgUrl) twImg.setAttribute('content', twImgUrl);
           }
         } catch (e) {}
       })();

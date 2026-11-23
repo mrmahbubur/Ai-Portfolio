@@ -37,7 +37,15 @@ import {
   User,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { auth, googleAuthProvider, db, handleFirestoreError, OperationType, writeStoredAuthUser } from '../lib/firebase';
+import {
+  auth,
+  googleAuthProvider,
+  db,
+  handleFirestoreError,
+  OperationType,
+  writeStoredAuthUser,
+  type AuthSessionUser,
+} from '../lib/firebase';
 import { formatFirebaseAuthError } from '../lib/firebaseAuthErrors';
 import {
   INPUT_LIMITS,
@@ -51,10 +59,10 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: 'signin' | 'signup' | 'preview';
-  currentUser: any;
+  currentUser: AuthSessionUser | null;
   authError?: string | null;
   onClearAuthError?: () => void;
-  onUserChanged?: (user: any) => void;
+  onUserChanged?: (user: AuthSessionUser | null) => void;
   onAnnounce?: (text: string) => void;
 }
 
@@ -358,7 +366,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           console.debug('Parallel Firebase auth sync notice:', formatFirebaseAuthError(fbSyncErr));
         }
 
-        onUserChanged?.(persistedUser as any);
+        onUserChanged?.(persistedUser);
         setSuccessMsg('Signed in successfully! Your subscriber preferences are active.');
         onAnnounce?.(`Welcome back! You are signed in.`);
         setTimeout(() => {
@@ -370,16 +378,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // 2. If server account was not found, check Firebase Auth client as fallback
       try {
         const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        const fbUser = {
+        const fbUser: AuthSessionUser = {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: cred.user.displayName,
           photoURL: cred.user.photoURL,
-          emailVerified: cred.user.emailVerified,
+          emailVerified: Boolean(cred.user.emailVerified),
+          isServerAccount: false,
         };
-        writeStoredAuthUser(fbUser);
+        const persisted = writeStoredAuthUser(fbUser) || fbUser;
 
-        onUserChanged?.(cred.user);
+        onUserChanged?.(persisted);
         await syncUserToFirestore(cred.user);
         await registerSubscriberOnServer(
           cred.user.email || cleanEmail,
@@ -528,7 +537,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const persistedUser = writeStoredAuthUser(activeUser) || activeUser;
 
       // 4. Update session
-      onUserChanged?.(persistedUser as any);
+      onUserChanged?.(persistedUser);
 
       // 5. Display dedicated Firebase verification notice in AuthModal
       setSignupVerificationNotice({
@@ -569,7 +578,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       const cred = await signInWithPopup(auth, googleAuthProvider);
-      onUserChanged?.(cred.user);
+      const googleSessionUser: AuthSessionUser = {
+        uid: cred.user.uid,
+        email: cred.user.email,
+        displayName: cred.user.displayName,
+        photoURL: cred.user.photoURL,
+        emailVerified: Boolean(cred.user.emailVerified),
+        isServerAccount: false,
+      };
+      const persistedGoogleUser = writeStoredAuthUser(googleSessionUser) || googleSessionUser;
+      onUserChanged?.(persistedGoogleUser);
       await syncUserToFirestore(cred.user);
       await registerSubscriberOnServer(
         cred.user.email || '',
@@ -676,8 +694,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       // 2. Update Firebase auth profile if applicable
       try {
-        if (currentUser.providerData) {
-          await updateProfile(currentUser, { displayName: cleanName });
+        if (auth.currentUser && auth.currentUser.uid === currentUser.uid) {
+          await updateProfile(auth.currentUser, { displayName: cleanName });
         }
       } catch (fbErr) {}
 
@@ -1087,7 +1105,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <ShieldCheck className="w-3.5 h-3.5 text-[var(--gold)]" /> Auth Provider:
                     </span>
                     <span className="text-[var(--text)]">
-                      {currentUser.providerData?.[0]?.providerId === 'google.com'
+                      {auth.currentUser?.providerData?.[0]?.providerId === 'google.com'
                         ? 'Google OAuth'
                         : 'Email & Password'}
                     </span>

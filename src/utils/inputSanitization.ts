@@ -11,7 +11,7 @@ export const INPUT_LIMITS = {
   PASSWORD_MAX: 128,
 } as const;
 
-export const EMAIL_PATTERN = /^[^\s@<>'"/?&=\\]+@[^\s@<>'"/?&=\\]+\.[^\s@<>'"/?&=\\]{2,}$/;
+export const EMAIL_PATTERN = /^[^\s@<>'"/?&=\\:#%]+@[^\s@<>'"/?&=\\:#%]+\.[^\s@<>'"/?&=\\:#%]{2,}$/;
 
 const CONTROL_CHARS_INLINE = /[\u0000-\u001F\u007F]/g;
 const CONTROL_CHARS_MULTILINE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
@@ -179,7 +179,11 @@ export function sanitizeGmailComposeHref(options: {
   if (options.url) {
     try {
       const parsed = new URL(options.url);
-      if (parsed.protocol === 'https:' && parsed.hostname === 'mail.google.com') {
+      if (
+        parsed.protocol === 'https:' &&
+        parsed.hostname === 'mail.google.com' &&
+        /^\/mail(\/u\/\d+)?\/?$/i.test(parsed.pathname)
+      ) {
         const paramTo = parsed.searchParams.get('to');
         const paramSu = parsed.searchParams.get('su');
         const paramBody = parsed.searchParams.get('body');

@@ -1,5 +1,5 @@
 import { getAllSubscribers, cleanSiteUrl, FEATURED_PLATFORM_URL } from './subscribers';
-import { escapeHtml, safeEmailHref, safeMailtoHref } from './emailSanitizer.ts';
+import { escapeCdata, escapeHtml, safeEmailHref, safeMailtoHref } from './emailSanitizer.ts';
 
 export interface SocialSharePack {
   platform: 'linkedin' | 'x' | 'whatsapp' | 'telegram' | 'facebook' | 'reddit' | 'email';
@@ -159,26 +159,31 @@ export function generateRssFeed(siteUrl?: string): string {
     },
   ];
 
-  const itemsXml = items.map((it) => `
+  const safeTargetXmlUrl = escapeHtml(safeEmailHref(targetUrl));
+  const itemsXml = items.map((it) => {
+    const safeItemLink = escapeHtml(safeEmailHref(it.link, targetUrl));
+    const safeItemGuid = escapeHtml(it.guid);
+    return `
     <item>
-      <title><![CDATA[${it.title}]]></title>
-      <link>${it.link}</link>
-      <guid isPermaLink="false">${it.guid}</guid>
-      <description><![CDATA[${it.description}]]></description>
-      <category><![CDATA[${it.category}]]></category>
-      <pubDate>${it.pubDate}</pubDate>
+      <title><![CDATA[${escapeCdata(it.title)}]]></title>
+      <link>${safeItemLink}</link>
+      <guid isPermaLink="false">${safeItemGuid}</guid>
+      <description><![CDATA[${escapeCdata(it.description)}]]></description>
+      <category><![CDATA[${escapeCdata(it.category)}]]></category>
+      <pubDate>${escapeHtml(it.pubDate)}</pubDate>
       <author>mr216873@gmail.com (M R S)</author>
-    </item>`).join('');
+    </item>`;
+  }).join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>M R S • Certified IT Support Professional &amp; Web Manager</title>
-    <link>${targetUrl}</link>
+    <link>${safeTargetXmlUrl}</link>
     <description>Official updates, verified IT support solutions, tech blog guides, and digital platforms by M R S.</description>
     <language>en-us</language>
-    <lastBuildDate>${pubDate}</lastBuildDate>
-    <atom:link href="${targetUrl}/rss.xml" rel="self" type="application/rss+xml"/>
+    <lastBuildDate>${escapeHtml(pubDate)}</lastBuildDate>
+    <atom:link href="${safeTargetXmlUrl}/rss.xml" rel="self" type="application/rss+xml"/>
     <managingEditor>mr216873@gmail.com (M R S)</managingEditor>
     <webMaster>mr216873@gmail.com (M R S)</webMaster>
     ${itemsXml}
@@ -188,22 +193,22 @@ export function generateRssFeed(siteUrl?: string): string {
 
 // Generate valid Sitemap XML for Google, Bing, and Search Engine Bots
 export function generateSitemapXml(siteUrl?: string): string {
-  const targetUrl = escapeHtml(cleanSiteUrl(siteUrl));
+  const baseTargetUrl = safeEmailHref(cleanSiteUrl(siteUrl));
   const today = new Date().toISOString().split('T')[0];
 
   const pages = [
-    { loc: `${targetUrl}/`, priority: '1.0', changefreq: 'daily' },
-    { loc: `${targetUrl}/#about`, priority: '0.9', changefreq: 'weekly' },
-    { loc: `${targetUrl}/#projects`, priority: '0.9', changefreq: 'weekly' },
-    { loc: `${targetUrl}/#skills`, priority: '0.8', changefreq: 'monthly' },
-    { loc: `${targetUrl}/#contact`, priority: '0.8', changefreq: 'monthly' },
-    { loc: `${targetUrl}/#cv-download`, priority: '0.8', changefreq: 'weekly' },
+    { loc: `${baseTargetUrl}/`, priority: '1.0', changefreq: 'daily' },
+    { loc: `${baseTargetUrl}/#about`, priority: '0.9', changefreq: 'weekly' },
+    { loc: `${baseTargetUrl}/#projects`, priority: '0.9', changefreq: 'weekly' },
+    { loc: `${baseTargetUrl}/#skills`, priority: '0.8', changefreq: 'monthly' },
+    { loc: `${baseTargetUrl}/#contact`, priority: '0.8', changefreq: 'monthly' },
+    { loc: `${baseTargetUrl}/#cv-download`, priority: '0.8', changefreq: 'weekly' },
   ];
 
   const urlsXml = pages.map((p) => `
   <url>
-    <loc>${p.loc}</loc>
-    <lastmod>${today}</lastmod>
+    <loc>${escapeHtml(p.loc)}</loc>
+    <lastmod>${escapeHtml(today)}</lastmod>
     <changefreq>${p.changefreq}</changefreq>
     <priority>${p.priority}</priority>
   </url>`).join('');
@@ -324,7 +329,7 @@ Personal Concierge for M R S (Certified IT Support Professional)`;
         </div>
 
         <div style="background: #0B0F19; border-top: 1px solid #1E293B; padding: 16px 30px; text-align: center; font-size: 11px; color: #64748B;">
-          Direct Email: <a href="mailto:mr216873@gmail.com" style="color: #E2B867; text-decoration: none;">mr216873@gmail.com</a> • Hub: <a href="${safeHubUrl}" style="color: #94A3B8; text-decoration: none;">${safeHubUrl}</a>
+          Direct Email: <a href="${escapeHtml(safeMailtoHref('mr216873@gmail.com'))}" style="color: #E2B867; text-decoration: none;">mr216873@gmail.com</a> • Hub: <a href="${safeHubUrl}" style="color: #94A3B8; text-decoration: none;">${safeHubUrl}</a>
         </div>
       </div>
     </body>

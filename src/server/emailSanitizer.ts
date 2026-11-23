@@ -11,6 +11,12 @@ export function escapeHtml(unsafe: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
+export function escapeCdata(unsafe: unknown): string {
+  return String(unsafe ?? '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/\]\]>/g, ']]]]><![CDATA[>');
+}
+
 export function stripCrlf(value: unknown, maxLength?: number): string {
   const cleaned = String(value ?? '')
     .replace(/[\r\n\u0000-\u001F\u007F]+/g, ' ')
@@ -39,10 +45,10 @@ export function safeEmailHref(
 ): string {
   if (!url || typeof url !== 'string') return fallback;
   const trimmed = url.trim();
-  if (!trimmed) return fallback;
+  if (!trimmed || trimmed.startsWith('//')) return fallback;
   try {
     const parsed = new URL(trimmed);
-    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+    if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && !parsed.username && !parsed.password) {
       return parsed.toString().replace(/\/+$/, '');
     }
     return fallback;
@@ -70,7 +76,7 @@ export function escapeJsonLdString(unsafe: unknown): string {
     .replace(/[\u0000-\u001F\u007F]/g, '');
 }
 
-const SERVER_EMAIL_PATTERN = /^[^\s@<>'"/?&=\\]+@[^\s@<>'"/?&=\\]+\.[^\s@<>'"/?&=\\]{2,}$/;
+const SERVER_EMAIL_PATTERN = /^[^\s@<>'"/?&=\\:#%]+@[^\s@<>'"/?&=\\:#%]+\.[^\s@<>'"/?&=\\:#%]{2,}$/;
 
 /**
  * Validates and builds a sanitized mailto: URI for HTML email links and client fallback responses.
@@ -85,12 +91,11 @@ export function safeMailtoHref(
   }
 ): string {
   const fallback = options?.fallbackEmail || 'mr216873@gmail.com';
-  const cleaned = String(email ?? '')
-    .replace(/[\u0000-\u001F\u007F\s<>]/g, '')
-    .trim()
-    .slice(0, 128);
+  const rawEmail = String(email ?? '').trim();
+  const hasForbiddenChars = /[\u0000-\u001F\u007F\s<>]/.test(rawEmail);
+  const cleaned = rawEmail.slice(0, 128);
 
-  const hasValidRecipient = SERVER_EMAIL_PATTERN.test(cleaned);
+  const hasValidRecipient = !hasForbiddenChars && rawEmail.length <= 128 && SERVER_EMAIL_PATTERN.test(cleaned);
   const recipient = hasValidRecipient
     ? cleaned
     : options?.allowEmptyRecipient
@@ -122,11 +127,13 @@ export function safeGmailComposeHref(
   body?: unknown,
   fallbackEmail = 'mr216873@gmail.com'
 ): string {
-  const cleanedTo = String(to ?? '')
-    .replace(/[\u0000-\u001F\u007F\s<>]/g, '')
-    .trim()
-    .slice(0, 128);
-  const recipient = SERVER_EMAIL_PATTERN.test(cleanedTo) ? cleanedTo : fallbackEmail;
+  const rawTo = String(to ?? '').trim();
+  const hasForbiddenChars = /[\u0000-\u001F\u007F\s<>]/.test(rawTo);
+  const cleanedTo = rawTo.slice(0, 128);
+  const recipient =
+    !hasForbiddenChars && rawTo.length <= 128 && SERVER_EMAIL_PATTERN.test(cleanedTo)
+      ? cleanedTo
+      : fallbackEmail;
 
   const query = new URLSearchParams({
     view: 'cm',
