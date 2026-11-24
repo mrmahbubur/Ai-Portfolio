@@ -129,9 +129,14 @@ export function maliciousRequestGuard(req: Request, res: Response, next: NextFun
 /**
  * 3. Adaptive In-Memory Rate Limiter Middleware
  */
+function normalizeRequestPath(rawPath: string): string {
+  const collapsed = (rawPath || '/').toLowerCase().replace(/\/{2,}/g, '/').replace(/\/+$/, '');
+  return collapsed || '/';
+}
+
 export function adaptiveRateLimiter(req: Request, res: Response, next: NextFunction) {
-  const path = req.path.toLowerCase().replace(/\/+$/, '') || '/';
-  if (path === '/health' || path === '/api/health' || path === '/ready') {
+  const normalizedPath = normalizeRequestPath(req.path);
+  if (normalizedPath === '/health' || normalizedPath === '/api/health' || normalizedPath === '/ready') {
     return next();
   }
 
@@ -139,11 +144,13 @@ export function adaptiveRateLimiter(req: Request, res: Response, next: NextFunct
   const now = Date.now();
 
   // Route Classification
-  const isSubmission = path.includes('/api/inquiries') || path.includes('/api/subscribe');
+  const isSubmission =
+    normalizedPath.startsWith('/api/inquiries') ||
+    normalizedPath.startsWith('/api/subscribe');
   const isSensitiveVerification =
-    path.includes('/api/verify-human-face') ||
-    path.includes('/api/generate-cv-pdf') ||
-    path.includes('/api/notify-cv-download');
+    normalizedPath.startsWith('/api/verify-human-face') ||
+    normalizedPath.startsWith('/api/generate-cv-pdf') ||
+    normalizedPath.startsWith('/api/notify-cv-download');
 
   if (isSubmission) {
     const bucket = submissionRateLimitStore.get(ip) || { count: 0, resetAt: now + 5 * 60 * 1000 };
@@ -173,7 +180,7 @@ export function adaptiveRateLimiter(req: Request, res: Response, next: NextFunct
         error: 'Verification rate limit exceeded. Please wait a moment before trying again.',
       });
     }
-  } else if (path.startsWith('/api/')) {
+  } else if (normalizedPath === '/api' || normalizedPath.startsWith('/api/')) {
     const bucket = generalRateLimitStore.get(ip) || { count: 0, resetAt: now + 60 * 1000 };
     if (now > bucket.resetAt) {
       bucket.count = 0;

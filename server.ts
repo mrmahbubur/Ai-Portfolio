@@ -127,11 +127,18 @@ function resolveRequestOrigin(req: express.Request): string {
   return cleanSiteUrl();
 }
 
+function parseServerPort(rawValue: string | undefined, fallback = 3000): number {
+  const trimmed = (rawValue ?? "").trim();
+  if (!/^[1-9]\d{0,4}$/.test(trimmed)) {
+    return fallback;
+  }
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= 65535 ? parsed : fallback;
+}
+
 const app = express();
 app.set("trust proxy", 1);
-const rawPort = (process.env.PORT || "").trim();
-const parsedPort = /^\d+$/.test(rawPort) ? Number(rawPort) : NaN;
-const PORT = Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 3000;
+const PORT = parseServerPort(process.env.PORT, 3000);
 
 // High Security System Middleware Stack
 app.use(securityHeadersMiddleware);
