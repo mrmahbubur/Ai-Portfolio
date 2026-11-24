@@ -147,31 +147,37 @@ export function generatePoliciesForYear(year: number): SitePoliciesManifest {
   };
 }
 
-function isValidSitePolicyItem(value: unknown): value is SitePolicyItem {
+export function isValidSitePolicyItem(value: unknown): value is SitePolicyItem {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
   return (
     typeof item.id === 'string' &&
+    item.id.trim().length > 0 &&
     typeof item.title === 'string' &&
+    item.title.trim().length > 0 &&
     typeof item.shortDescription === 'string' &&
     typeof item.lastUpdated === 'string' &&
     typeof item.effectiveYear === 'number' &&
     Number.isInteger(item.effectiveYear) &&
     typeof item.version === 'string' &&
+    item.version.trim().length > 0 &&
     Array.isArray(item.content) &&
     item.content.every((line) => typeof line === 'string')
   );
 }
 
-function isValidSitePoliciesManifest(value: unknown): value is SitePoliciesManifest {
+export function isValidSitePoliciesManifest(value: unknown): value is SitePoliciesManifest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const manifest = value as Record<string, unknown>;
   if (
     typeof manifest.effectiveYear !== 'number' ||
     !Number.isInteger(manifest.effectiveYear) ||
     typeof manifest.lastRunTimestamp !== 'string' ||
+    Number.isNaN(Date.parse(manifest.lastRunTimestamp)) ||
     typeof manifest.copyrightText !== 'string' ||
+    manifest.copyrightText.trim().length === 0 ||
     typeof manifest.ownerEmail !== 'string' ||
+    manifest.ownerEmail.trim().length === 0 ||
     !Array.isArray(manifest.legalComplianceStandards) ||
     !manifest.legalComplianceStandards.every((std) => typeof std === 'string')
   ) {
@@ -180,19 +186,23 @@ function isValidSitePoliciesManifest(value: unknown): value is SitePoliciesManif
   if (!manifest.policies || typeof manifest.policies !== 'object' || Array.isArray(manifest.policies)) {
     return false;
   }
-  const policyEntries = Object.values(manifest.policies as Record<string, unknown>);
-  return policyEntries.length > 0 && policyEntries.every(isValidSitePolicyItem);
+  const policyEntries = Object.entries(manifest.policies as Record<string, unknown>);
+  return (
+    policyEntries.length > 0 &&
+    policyEntries.every(([key, item]) => key.trim().length > 0 && isValidSitePolicyItem(item))
+  );
 }
 
-function isValidAnnualUpdateLog(value: unknown): value is AnnualUpdateLog {
+export function isValidAnnualUpdateLog(value: unknown): value is AnnualUpdateLog {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const entry = value as Record<string, unknown>;
   return (
     typeof entry.updateId === 'string' &&
-    entry.updateId.length > 0 &&
+    entry.updateId.trim().length > 0 &&
     typeof entry.year === 'number' &&
     Number.isInteger(entry.year) &&
     typeof entry.timestamp === 'string' &&
+    !Number.isNaN(Date.parse(entry.timestamp)) &&
     (entry.status === 'applied' || entry.status === 'already_up_to_date') &&
     typeof entry.summary === 'string' &&
     typeof entry.emailNotified === 'boolean'

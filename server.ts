@@ -4936,7 +4936,7 @@ async function startServer() {
         }
         const safeClientCode = result.code
           .replace(
-            /transport\s*\.connect\s*\(\s*createHMRHandler\s*\([^)]*\)\s*\)\s*;?/g,
+            /transport\s*\.\s*connect\s*\(\s*createHMRHandler\s*\([^)]*\)\s*\)\s*;?/g,
             "/* HMR disabled: transport.connect skipped */"
           )
           .replace(
