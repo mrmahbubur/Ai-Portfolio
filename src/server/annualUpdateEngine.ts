@@ -147,6 +147,58 @@ export function generatePoliciesForYear(year: number): SitePoliciesManifest {
   };
 }
 
+function isValidSitePolicyItem(value: unknown): value is SitePolicyItem {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.id === 'string' &&
+    typeof item.title === 'string' &&
+    typeof item.shortDescription === 'string' &&
+    typeof item.lastUpdated === 'string' &&
+    typeof item.effectiveYear === 'number' &&
+    Number.isInteger(item.effectiveYear) &&
+    typeof item.version === 'string' &&
+    Array.isArray(item.content) &&
+    item.content.every((line) => typeof line === 'string')
+  );
+}
+
+function isValidSitePoliciesManifest(value: unknown): value is SitePoliciesManifest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const manifest = value as Record<string, unknown>;
+  if (
+    typeof manifest.effectiveYear !== 'number' ||
+    !Number.isInteger(manifest.effectiveYear) ||
+    typeof manifest.lastRunTimestamp !== 'string' ||
+    typeof manifest.copyrightText !== 'string' ||
+    typeof manifest.ownerEmail !== 'string' ||
+    !Array.isArray(manifest.legalComplianceStandards) ||
+    !manifest.legalComplianceStandards.every((std) => typeof std === 'string')
+  ) {
+    return false;
+  }
+  if (!manifest.policies || typeof manifest.policies !== 'object' || Array.isArray(manifest.policies)) {
+    return false;
+  }
+  const policyEntries = Object.values(manifest.policies as Record<string, unknown>);
+  return policyEntries.length > 0 && policyEntries.every(isValidSitePolicyItem);
+}
+
+function isValidAnnualUpdateLog(value: unknown): value is AnnualUpdateLog {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  return (
+    typeof entry.updateId === 'string' &&
+    entry.updateId.length > 0 &&
+    typeof entry.year === 'number' &&
+    Number.isInteger(entry.year) &&
+    typeof entry.timestamp === 'string' &&
+    (entry.status === 'applied' || entry.status === 'already_up_to_date') &&
+    typeof entry.summary === 'string' &&
+    typeof entry.emailNotified === 'boolean'
+  );
+}
+
 /**
  * Returns current cached or persisted site policies.
  */
@@ -157,10 +209,11 @@ export function getCurrentPolicies(): SitePoliciesManifest {
   if (fs.existsSync(POLICIES_FILE)) {
     try {
       const raw = fs.readFileSync(POLICIES_FILE, 'utf-8');
-      const manifest: SitePoliciesManifest = JSON.parse(raw);
-      if (manifest && manifest.effectiveYear === currentYear && manifest.policies) {
-        return manifest;
+      const parsed: unknown = JSON.parse(raw);
+      if (isValidSitePoliciesManifest(parsed) && parsed.effectiveYear === currentYear) {
+        return parsed;
       }
+      console.warn('[AnnualUpdate] Cached policies manifest invalid or outdated; regenerating fresh manifest.');
     } catch (e) {
       console.warn('[AnnualUpdate] Failed reading policies file, generating fresh manifest:', e);
     }
@@ -267,8 +320,8 @@ export async function checkAndApplyAnnualUpdate(force = false): Promise<AnnualUp
   let existingManifest: SitePoliciesManifest | null = null;
   if (fs.existsSync(POLICIES_FILE)) {
     try {
-      const parsedManifest = JSON.parse(fs.readFileSync(POLICIES_FILE, 'utf-8'));
-      if (parsedManifest && typeof parsedManifest === 'object' && typeof parsedManifest.effectiveYear === 'number') {
+      const parsedManifest: unknown = JSON.parse(fs.readFileSync(POLICIES_FILE, 'utf-8'));
+      if (isValidSitePoliciesManifest(parsedManifest)) {
         existingManifest = parsedManifest;
       } else {
         console.warn('[AnnualUpdate] Malformed policies manifest shape; regenerating.');
@@ -314,19 +367,9 @@ export async function checkAndApplyAnnualUpdate(force = false): Promise<AnnualUp
     let logs: AnnualUpdateLog[] = [];
     if (fs.existsSync(LOGS_FILE)) {
       try {
-        const parsed = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf-8'));
+        const parsed: unknown = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf-8'));
         if (Array.isArray(parsed)) {
-          logs = parsed.filter(
-            (entry): entry is AnnualUpdateLog =>
-              Boolean(
-                entry &&
-                  typeof entry === 'object' &&
-                  typeof entry.updateId === 'string' &&
-                  typeof entry.year === 'number' &&
-                  typeof entry.timestamp === 'string' &&
-                  (entry.status === 'applied' || entry.status === 'already_up_to_date')
-              )
-          );
+          logs = parsed.filter(isValidAnnualUpdateLog);
         } else {
           console.warn('[AnnualUpdate] Annual update history file was not an array; resetting.');
         }

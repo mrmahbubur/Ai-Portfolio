@@ -4936,15 +4936,15 @@ async function startServer() {
         }
         const safeClientCode = result.code
           .replace(
-            /transport\.connect\(createHMRHandler\([^)]*\)\)\s*;?/g,
+            /transport\s*\.connect\s*\(\s*createHMRHandler\s*\([^)]*\)\s*\)\s*;?/g,
             "/* HMR disabled: transport.connect skipped */"
           )
           .replace(
-            /throw new Error\((['"])send was called before connect\1\)\s*;?/g,
+            /throw\s+new\s+Error\s*\(\s*(['"])send was called before connect\1\s*\)\s*;?/g,
             "return;"
           )
           .replace(
-            /throw new Error\((['"])invoke was called before connect\1\)\s*;?/g,
+            /throw\s+new\s+Error\s*\(\s*(['"])invoke was called before connect\1\s*\)\s*;?/g,
             "return undefined;"
           );
         res
