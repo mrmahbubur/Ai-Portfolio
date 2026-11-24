@@ -130,7 +130,7 @@ export function maliciousRequestGuard(req: Request, res: Response, next: NextFun
  * 3. Adaptive In-Memory Rate Limiter Middleware
  */
 export function adaptiveRateLimiter(req: Request, res: Response, next: NextFunction) {
-  const path = req.path.toLowerCase();
+  const path = req.path.toLowerCase().replace(/\/+$/, '') || '/';
   if (path === '/health' || path === '/api/health' || path === '/ready') {
     return next();
   }

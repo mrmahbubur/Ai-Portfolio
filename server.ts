@@ -129,8 +129,9 @@ function resolveRequestOrigin(req: express.Request): string {
 
 const app = express();
 app.set("trust proxy", 1);
-const parsedPort = Number.parseInt(process.env.PORT || "", 10);
-const PORT = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535 ? parsedPort : 3000;
+const rawPort = (process.env.PORT || "").trim();
+const parsedPort = /^\d+$/.test(rawPort) ? Number(rawPort) : NaN;
+const PORT = Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 3000;
 
 // High Security System Middleware Stack
 app.use(securityHeadersMiddleware);
