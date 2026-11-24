@@ -306,7 +306,14 @@ export async function checkAndApplyAnnualUpdate(force = false): Promise<AnnualUp
   try {
     let logs: AnnualUpdateLog[] = [];
     if (fs.existsSync(LOGS_FILE)) {
-      logs = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf-8'));
+      try {
+        const parsed = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf-8'));
+        if (Array.isArray(parsed)) {
+          logs = parsed;
+        }
+      } catch {
+        logs = [];
+      }
     }
     logs.push(log);
     fs.writeFileSync(LOGS_FILE, JSON.stringify(logs.slice(-50), null, 2), 'utf-8');
