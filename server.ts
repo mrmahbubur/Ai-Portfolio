@@ -5,7 +5,6 @@ import path from "path";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { WebSocketServer, WebSocket } from "ws";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold, ThinkingLevel, Modality, type Content, type Part, type LiveServerMessage } from "@google/genai";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
@@ -121,11 +120,16 @@ function resolveRequestOrigin(req: express.Request): string {
     const hostOrigin = resolveOriginUrl(`${proto}://${rawHost}`);
     if (hostOrigin) return hostOrigin;
   }
+  if (process.env.RENDER_EXTERNAL_URL) {
+    const renderOrigin = resolveOriginUrl(process.env.RENDER_EXTERNAL_URL);
+    if (renderOrigin) return renderOrigin;
+  }
   return cleanSiteUrl();
 }
 
 const app = express();
-const PORT = 3000;
+app.set("trust proxy", 1);
+const PORT = Number(process.env.PORT) || 3000;
 
 // High Security System Middleware Stack
 app.use(securityHeadersMiddleware);
@@ -715,7 +719,7 @@ async function fetchFreshGravatarProfile(usernameParam?: string, emailParam?: st
       "mrxshahin.ai.studio",
       "ais-dev-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app",
       "ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app",
-      ...[process.env.APP_URL, process.env.SHARED_APP_URL]
+      ...[process.env.APP_URL, process.env.SHARED_APP_URL, process.env.RENDER_EXTERNAL_URL]
         .filter((u): u is string => Boolean(u))
         .map((u) => normalizeUrl(u)),
     ].filter(Boolean);
@@ -4881,6 +4885,7 @@ async function startServer() {
   };
 
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -4938,13 +4943,21 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    const publicPath = path.join(process.cwd(), "public");
+    app.use(express.static(distPath, { maxAge: "1h", index: false }));
+    if (fs.existsSync(publicPath)) {
+      app.use(express.static(publicPath, { maxAge: "1h", index: false }));
+    }
     app.get("*", (req, res) => {
+      if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ error: "API endpoint not found" });
+      }
+      const distIndexPath = path.join(distPath, "index.html");
       try {
-        const html = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
-        res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(injectCanonicalSeoHtml(html, req));
+        const html = fs.readFileSync(distIndexPath, "utf-8");
+        return res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(injectCanonicalSeoHtml(html, req));
       } catch {
-        res.sendFile(path.join(distPath, "index.html"));
+        return res.sendFile(distIndexPath);
       }
     });
   }
@@ -4992,9 +5005,10 @@ async function startServer() {
     if (typeof req.headers.host === "string") {
       addHost(req.headers.host);
     }
-    if (process.env.APP_URL) {
+    for (const envCandidate of [process.env.APP_URL, process.env.RENDER_EXTERNAL_URL, process.env.SHARED_APP_URL]) {
+      if (!envCandidate) continue;
       try {
-        allowedHosts.add(new URL(cleanSiteUrl(process.env.APP_URL)).host.toLowerCase());
+        allowedHosts.add(new URL(cleanSiteUrl(envCandidate)).host.toLowerCase());
       } catch {}
     }
 
