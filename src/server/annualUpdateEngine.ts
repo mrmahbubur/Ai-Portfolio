@@ -156,13 +156,16 @@ export function isValidSitePolicyItem(value: unknown): value is SitePolicyItem {
     typeof item.title === 'string' &&
     item.title.trim().length > 0 &&
     typeof item.shortDescription === 'string' &&
+    item.shortDescription.trim().length > 0 &&
     typeof item.lastUpdated === 'string' &&
+    item.lastUpdated.trim().length > 0 &&
     typeof item.effectiveYear === 'number' &&
     Number.isInteger(item.effectiveYear) &&
     typeof item.version === 'string' &&
     item.version.trim().length > 0 &&
     Array.isArray(item.content) &&
-    item.content.every((line) => typeof line === 'string')
+    item.content.length > 0 &&
+    item.content.every((line) => typeof line === 'string' && line.trim().length > 0)
   );
 }
 
@@ -179,7 +182,8 @@ export function isValidSitePoliciesManifest(value: unknown): value is SitePolici
     typeof manifest.ownerEmail !== 'string' ||
     manifest.ownerEmail.trim().length === 0 ||
     !Array.isArray(manifest.legalComplianceStandards) ||
-    !manifest.legalComplianceStandards.every((std) => typeof std === 'string')
+    manifest.legalComplianceStandards.length === 0 ||
+    !manifest.legalComplianceStandards.every((std) => typeof std === 'string' && std.trim().length > 0)
   ) {
     return false;
   }
@@ -205,6 +209,7 @@ export function isValidAnnualUpdateLog(value: unknown): value is AnnualUpdateLog
     !Number.isNaN(Date.parse(entry.timestamp)) &&
     (entry.status === 'applied' || entry.status === 'already_up_to_date') &&
     typeof entry.summary === 'string' &&
+    entry.summary.trim().length > 0 &&
     typeof entry.emailNotified === 'boolean'
   );
 }
