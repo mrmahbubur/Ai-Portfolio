@@ -267,8 +267,15 @@ export async function checkAndApplyAnnualUpdate(force = false): Promise<AnnualUp
   let existingManifest: SitePoliciesManifest | null = null;
   if (fs.existsSync(POLICIES_FILE)) {
     try {
-      existingManifest = JSON.parse(fs.readFileSync(POLICIES_FILE, 'utf-8'));
-    } catch {}
+      const parsedManifest = JSON.parse(fs.readFileSync(POLICIES_FILE, 'utf-8'));
+      if (parsedManifest && typeof parsedManifest === 'object' && typeof parsedManifest.effectiveYear === 'number') {
+        existingManifest = parsedManifest;
+      } else {
+        console.warn('[AnnualUpdate] Malformed policies manifest shape; regenerating.');
+      }
+    } catch (err) {
+      console.warn('[AnnualUpdate] Failed parsing policies manifest; regenerating:', err);
+    }
   }
 
   const needsUpdate = force || !existingManifest || existingManifest.effectiveYear < currentYear;
@@ -309,9 +316,22 @@ export async function checkAndApplyAnnualUpdate(force = false): Promise<AnnualUp
       try {
         const parsed = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf-8'));
         if (Array.isArray(parsed)) {
-          logs = parsed;
+          logs = parsed.filter(
+            (entry): entry is AnnualUpdateLog =>
+              Boolean(
+                entry &&
+                  typeof entry === 'object' &&
+                  typeof entry.updateId === 'string' &&
+                  typeof entry.year === 'number' &&
+                  typeof entry.timestamp === 'string' &&
+                  (entry.status === 'applied' || entry.status === 'already_up_to_date')
+              )
+          );
+        } else {
+          console.warn('[AnnualUpdate] Annual update history file was not an array; resetting.');
         }
-      } catch {
+      } catch (parseErr) {
+        console.warn('[AnnualUpdate] Malformed annual update history file; resetting:', parseErr);
         logs = [];
       }
     }
