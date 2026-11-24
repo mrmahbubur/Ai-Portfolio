@@ -7,15 +7,7 @@ import { getAllAccountsCount } from './accounts.ts';
 import { getReferralStats } from './promotion.ts';
 import { getCurrentPolicies } from './annualUpdateEngine.ts';
 import { getAssistantSyncStatus } from './assistantBridge.ts';
-
-function escapeHtml(unsafe: unknown): string {
-  return String(unsafe ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml, sanitizeEmailSubject } from './emailSanitizer.ts';
 
 export interface VisitorHelpRecord {
   trackingNumber: string; // e.g. "MRS-AID-10001"
@@ -980,7 +972,7 @@ export async function sendMonthlyReport(
       await transporter.sendMail({
         from: `"M R S Monthly Operations" <${gmailUser}>`,
         to: OWNER_EMAIL,
-        subject: report.subject,
+        subject: sanitizeEmailSubject(report.subject),
         text: report.text,
         html: report.html,
       });

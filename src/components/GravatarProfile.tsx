@@ -53,6 +53,7 @@ import {
   sanitizeSafeHref,
   sanitizeSingleLineText,
 } from '../utils/inputSanitization';
+import { type AuthSessionUser } from '../lib/firebase';
 
 interface GravatarProfileProps {
   profile: BioProfile;
@@ -65,7 +66,7 @@ interface GravatarProfileProps {
   lastGravatarSync?: Date | null;
   onAnnounceDownload?: (text: string) => void;
   onSectionClick?: (key: string) => void;
-  currentUser?: any;
+  currentUser?: AuthSessionUser | null;
   onOpenAuthModal?: (tab?: 'signin' | 'signup') => void;
   onOpenSearch?: () => void;
   onOpenLiveVoice?: () => void;

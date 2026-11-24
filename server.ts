@@ -30,8 +30,10 @@ import {
 import {
   escapeHtml,
   escapeJsonLdString,
+  resolveOriginUrl,
   safeEmailHref,
   safeGmailComposeHref,
+  safeGoogleMapsHref,
   safeMailtoHref,
   sanitizeEmailSubject,
   stripCrlf,
@@ -101,6 +103,26 @@ export const CAMELLIA_MODEL = "gemini-4-hydrogen";
 export const CAMELLIA_TTS_MODEL = "gemini-3.8-flash-lite-tts";
 
 dotenv.config();
+
+function resolveRequestOrigin(req: express.Request): string {
+  if (process.env.APP_URL) {
+    const envOrigin = resolveOriginUrl(process.env.APP_URL);
+    if (envOrigin) return envOrigin;
+  }
+  const rawProto = String(req.headers["x-forwarded-proto"] || req.protocol || "https")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  const proto = rawProto === "http" ? "http" : "https";
+  const rawHost = String(req.headers["x-forwarded-host"] || req.headers.host || "")
+    .split(",")[0]
+    .trim();
+  if (/^[a-zA-Z0-9.-]+(?::[0-9]{1,5})?$/.test(rawHost)) {
+    const hostOrigin = resolveOriginUrl(`${proto}://${rawHost}`);
+    if (hostOrigin) return hostOrigin;
+  }
+  return cleanSiteUrl();
+}
 
 const app = express();
 const PORT = 3000;
@@ -1699,7 +1721,7 @@ async function sendCvDownloadNotificationEmail(info: {
 
   const safeLat = geo?.lat !== undefined && Number.isFinite(Number(geo.lat)) ? Number(geo.lat) : null;
   const safeLon = geo?.lon !== undefined && Number.isFinite(Number(geo.lon)) ? Number(geo.lon) : null;
-  const mapLink = safeLat !== null && safeLon !== null ? `https://www.google.com/maps?q=${safeLat},${safeLon}` : "";
+  const mapLink = safeGoogleMapsHref(safeLat, safeLon);
 
   // Prepare attachments if face capture image is present
   const attachments: Array<{ filename: string; content: Buffer; cid?: string; contentType?: string }> = [];
@@ -1740,7 +1762,7 @@ A visitor has downloaded your official Executive CV!
 • Country: ${geo?.country || "Unknown"} (${geo?.countryCode || "N/A"})
 • Region / State: ${geo?.regionName || "Unknown"}
 • City & Postal: ${geo?.city || "Unknown"} ${geo?.zip ? `[Zip: ${geo.zip}]` : ""}
-• Coordinates: ${geo?.lat && geo?.lon ? `${geo.lat}, ${geo.lon} (Map: ${mapLink})` : "Not available"}
+• Coordinates: ${safeLat !== null && safeLon !== null && mapLink ? `${safeLat}, ${safeLon} (Map: ${mapLink})` : "Not available"}
 • ISP Provider: ${geo?.isp || "Unknown ISP"}
 • Organization / ASN: ${geo?.org || geo?.as || "Unknown Organization"}
 
@@ -1899,7 +1921,7 @@ Dispatched automatically from your M R S Portfolio Backend.
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>City & Postal:</strong></td>
             <td style="padding: 5px 0; color: #F3F4F6;">${safeCity} ${safeZip ? `· Zip: ${safeZip}` : ""}</td>
           </tr>
-          ${safeLat !== null && safeLon !== null ? `
+          ${safeLat !== null && safeLon !== null && mapLink ? `
           <tr>
             <td style="padding: 5px 0; color: #9CA3AF;"><strong>Coordinates:</strong></td>
             <td style="padding: 5px 0;"><a href="${escapeHtml(safeEmailHref(mapLink, "https://maps.google.com"))}" target="_blank" rel="noopener noreferrer" style="color: #38BDF8; text-decoration: underline;">${safeLat}, ${safeLon} (Open on Google Maps)</a></td>
@@ -3628,22 +3650,15 @@ app.get("/api/inquiries", (req, res) => {
 // Extract and resolve the canonical URL for this site
 function resolveSiteUrl(req: express.Request): string {
   const candidateUrl = req.body?.siteUrl || req.body?.project?.siteUrl || req.body?.project?.link || req.body?.link;
-  if (candidateUrl && typeof candidateUrl === "string" && candidateUrl.startsWith("http")) {
-    return cleanSiteUrl(candidateUrl);
+  const candidateOrigin = resolveOriginUrl(candidateUrl);
+  if (candidateOrigin) {
+    return candidateOrigin;
   }
-  const origin = req.headers.origin;
-  if (origin && typeof origin === "string" && origin.startsWith("http")) {
-    return cleanSiteUrl(origin);
+  const headerOrigin = resolveOriginUrl(req.headers.origin);
+  if (headerOrigin) {
+    return headerOrigin;
   }
-  const forwardedHost = (req.headers["x-forwarded-host"] as string) || req.headers.host;
-  const forwardedProto = (req.headers["x-forwarded-proto"] as string) || "https";
-  if (forwardedHost) {
-    return cleanSiteUrl(`${forwardedProto}://${forwardedHost}`);
-  }
-  if (process.env.APP_URL) {
-    return cleanSiteUrl(process.env.APP_URL);
-  }
-  return "https://ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app";
+  return resolveRequestOrigin(req);
 }
 
 // Subscribe to M R S platform & project email updates
@@ -4046,7 +4061,7 @@ app.post("/api/promo/broadcast-digest", async (req, res) => {
         await transporter.sendMail({
           from: `"Camellia (M R S Assistant)" <${gmailUser}>`,
           to: "mr216873@gmail.com",
-          subject: `[PREVIEW] ${digest.subject}`,
+          subject: sanitizeEmailSubject(`[PREVIEW] ${digest.subject}`),
           text: digest.text,
           html: digest.html,
         });
@@ -4074,7 +4089,7 @@ app.post("/api/promo/broadcast-digest", async (req, res) => {
           await transporter.sendMail({
             from: `"Camellia (M R S Assistant)" <${gmailUser}>`,
             to: subscriber.email,
-            subject: digest.subject,
+            subject: sanitizeEmailSubject(digest.subject),
             text: digest.text,
             html: digest.html,
           });
@@ -4799,28 +4814,6 @@ async function startServer() {
 
   const server = http.createServer(app);
 
-  const resolveRequestOrigin = (req: express.Request): string => {
-    if (process.env.APP_URL) {
-      const cleanedEnvUrl = cleanSiteUrl(process.env.APP_URL);
-      try {
-        return new URL(cleanedEnvUrl).origin;
-      } catch {
-        return cleanedEnvUrl;
-      }
-    }
-    const rawProto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim().toLowerCase();
-    const proto = rawProto === "http" ? "http" : "https";
-    const rawHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
-    if (/^[a-zA-Z0-9.-]+(?::[0-9]{1,5})?$/.test(rawHost)) {
-      try {
-        return new URL(`${proto}://${rawHost}`).origin;
-      } catch {
-        return safeEmailHref(`${proto}://${rawHost}`);
-      }
-    }
-    return cleanSiteUrl();
-  };
-
   const injectCanonicalSeoHtml = (rawHtml: string, req: express.Request): string => {
     const baseOrigin = resolveRequestOrigin(req);
     const collapsedPath = (req.path || "/").replace(/\/{2,}/g, "/");
@@ -4919,6 +4912,27 @@ async function startServer() {
       } catch (e: any) {
         vite.ssrFixStacktrace(e);
         next(e);
+      }
+    });
+    app.get("/@vite/client", async (_req, res, next) => {
+      try {
+        const result = await vite.transformRequest("/@vite/client");
+        if (!result?.code) {
+          return next();
+        }
+        const safeClientCode = result.code.replace(
+          /transport\.connect\(createHMRHandler\([^)]*\)\);/g,
+          "/* HMR disabled: transport.connect skipped */"
+        );
+        res
+          .status(200)
+          .set({
+            "Content-Type": "application/javascript; charset=utf-8",
+            "Cache-Control": "no-cache",
+          })
+          .send(safeClientCode);
+      } catch (err) {
+        next(err);
       }
     });
     app.use(vite.middlewares);

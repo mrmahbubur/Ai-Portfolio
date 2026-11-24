@@ -154,3 +154,34 @@ export function safeGmailComposeHref(
 
   return `https://mail.google.com/mail/?${query.toString()}`;
 }
+
+/**
+ * Resolves and normalizes a URL string to its clean HTTP/HTTPS origin (no trailing slash or embedded credentials).
+ */
+export function resolveOriginUrl(url: unknown, fallback = ''): string {
+  if (!url || typeof url !== 'string') return fallback;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed.startsWith('//')) return fallback;
+  try {
+    const parsed = new URL(trimmed);
+    if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && !parsed.username && !parsed.password) {
+      return parsed.origin;
+    }
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Validates WGS-84 coordinates and constructs a safe Google Maps lookup URL.
+ */
+export function safeGoogleMapsHref(lat: unknown, lon: unknown): string {
+  const numLat = typeof lat === 'number' || typeof lat === 'string' ? Number(lat) : NaN;
+  const numLon = typeof lon === 'number' || typeof lon === 'string' ? Number(lon) : NaN;
+  if (!Number.isFinite(numLat) || !Number.isFinite(numLon)) return '';
+  if (numLat < -90 || numLat > 90 || numLon < -180 || numLon > 180) return '';
+  const queryCoord = encodeURIComponent(`${numLat.toFixed(6)},${numLon.toFixed(6)}`);
+  return safeEmailHref(`https://www.google.com/maps?q=${queryCoord}`, '');
+}
+

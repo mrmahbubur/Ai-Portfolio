@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES, getLanguageByCode } from '../utils/languages';
 import { PWAInstallButton } from './PWAInstallButton';
+import { type AuthSessionUser } from '../lib/firebase';
 
 interface HeaderHUDProps {
   isMuted: boolean;
@@ -30,7 +31,7 @@ interface HeaderHUDProps {
   onToggleTheme: () => void;
   activeLanguage?: string;
   onSelectLanguage?: (langCode: string) => void;
-  currentUser?: any;
+  currentUser?: AuthSessionUser | null;
   onOpenAuthModal?: (tab?: 'signin' | 'signup') => void;
 }
 

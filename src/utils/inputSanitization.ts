@@ -208,3 +208,20 @@ export function sanitizeGmailComposeHref(options: {
   return `https://mail.google.com/mail/?${query.toString()}`;
 }
 
+/**
+ * Resolves the active browser origin cleanly via URL parsing, falling back safely if unavailable.
+ */
+export function resolveBrowserOrigin(
+  fallback = 'https://ais-pre-kvr65sziiqaqoqlwvajinm-369506879239.asia-southeast1.run.app'
+): string {
+  if (typeof window === 'undefined' || !window.location?.origin) return fallback;
+  try {
+    const parsed = new URL(window.location.origin);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return parsed.origin;
+    }
+  } catch {}
+  return fallback;
+}
+
+

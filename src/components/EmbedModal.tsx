@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, Code2, Globe } from 'lucide-react';
+import { resolveBrowserOrigin } from '../utils/inputSanitization';
 
 interface EmbedModalProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ export const EmbedModal: React.FC<EmbedModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mrxshahin.blogspot.com';
+  const currentUrl = resolveBrowserOrigin('https://mrxshahin.blogspot.com');
 
   const embedCode = `<iframe
   src="${currentUrl}"

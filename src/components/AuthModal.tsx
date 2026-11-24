@@ -50,6 +50,7 @@ import { formatFirebaseAuthError } from '../lib/firebaseAuthErrors';
 import {
   INPUT_LIMITS,
   isValidEmailAddress,
+  resolveBrowserOrigin,
   sanitizeEmailInput,
   sanitizeSingleLineText,
 } from '../utils/inputSanitization';
@@ -268,7 +269,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: userEmail,
           name: name || undefined,
           uid: uid || undefined,
-          siteUrl: typeof window !== 'undefined' ? window.location.origin : undefined,
+          siteUrl: resolveBrowserOrigin(),
           receivePlatformUpdates,
           receiveBlogUpdates,
         }),
@@ -490,7 +491,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
 
       // 2. Also record and sync account to server database
-      let serverUser: any = null;
+      let serverUser: Partial<AuthSessionUser> | null = null;
       let welcomeEmailSent = false;
       try {
         const signupRes = await fetch('/api/auth/signup', {
@@ -502,14 +503,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             displayName: sanitizedName || undefined,
             receivePlatformUpdates,
             receiveBlogUpdates,
-            siteUrl: typeof window !== 'undefined' ? window.location.origin : undefined,
+            siteUrl: resolveBrowserOrigin(),
           }),
         });
 
         if (signupRes.ok) {
           const signupData = await signupRes.json();
           if (signupData.success) {
-            serverUser = signupData.user;
+            serverUser = signupData.user as Partial<AuthSessionUser>;
             welcomeEmailSent = Boolean(signupData.welcomeEmailSent);
           }
         }
@@ -639,12 +640,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // 5. Resend Email Verification
   const handleResendVerification = async () => {
-    const targetUser = auth.currentUser || currentUser;
-    if (!targetUser) {
+    const firebaseUser = auth.currentUser;
+    if (!currentUser && !firebaseUser) {
       setErrorMsg('No active user session found. Please sign in first.');
       return;
     }
-    if (!auth.currentUser && typeof targetUser.sendEmailVerification !== 'function') {
+    if (!firebaseUser) {
       setErrorMsg('Email verification links are dispatched for Firebase-linked accounts. Please sign in again if needed.');
       return;
     }
@@ -652,13 +653,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      if (auth.currentUser) {
-        await sendEmailVerification(auth.currentUser);
-      } else if (targetUser.sendEmailVerification) {
-        await targetUser.sendEmailVerification();
-      }
+      await sendEmailVerification(firebaseUser);
       setVerificationSent(true);
-      const targetEmail = targetUser.email || sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
+      const targetEmail = firebaseUser.email || currentUser?.email || sanitizeEmailInput(email, INPUT_LIMITS.EMAIL_MAX);
       setSuccessMsg(`Verification email dispatched to ${targetEmail}! Check your inbox and spam folder.`);
       onAnnounce?.('Firebase verification email sent to your inbox.');
     } catch (err: any) {
@@ -878,7 +875,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         body: JSON.stringify({
           email: currentUser.email,
           name: currentUser.displayName || undefined,
-          siteUrl: typeof window !== 'undefined' ? window.location.origin : undefined,
+          siteUrl: resolveBrowserOrigin(),
         }),
       });
       const data = await res.json();
