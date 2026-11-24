@@ -139,6 +139,7 @@ export default defineConfig(() => {
             'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
             'vendor-motion': ['motion'],
             'vendor-pdf': ['jspdf'],
+            'vendor-icons': ['lucide-react'],
           },
         },
       },

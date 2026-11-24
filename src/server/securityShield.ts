@@ -130,9 +130,13 @@ export function maliciousRequestGuard(req: Request, res: Response, next: NextFun
  * 3. Adaptive In-Memory Rate Limiter Middleware
  */
 export function adaptiveRateLimiter(req: Request, res: Response, next: NextFunction) {
+  const path = req.path.toLowerCase();
+  if (path === '/health' || path === '/api/health' || path === '/ready') {
+    return next();
+  }
+
   const ip = extractClientIp(req);
   const now = Date.now();
-  const path = req.path.toLowerCase();
 
   // Route Classification
   const isSubmission = path.includes('/api/inquiries') || path.includes('/api/subscribe');
